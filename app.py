@@ -12,8 +12,8 @@ st.set_page_config(
 )
 # 自定义桌面图标（PWA）
 st.markdown('''
-    <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26bd.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26bd.png">
+   <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/color/96/000000/football2.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://img.icons8.com/color/96/000000/football2.png">
 ''', unsafe_allow_html=True)
 # ---------- 核心模型函数 ----------
 
