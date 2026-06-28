@@ -65,23 +65,35 @@ def predict_match(home, away, match_type, home_elo, away_elo, home_xg, away_xg, 
         for a in range(0, 5):
             prob = poisson_prob(lam_h, h) * poisson_prob(lam_a, a)
             score_probs[(h, a)] = prob
-    best_score = max(score_probs, key=score_probs.get)
-    best_prob = score_probs[best_score]
+
+    # 1. 计算方向概率
     home_win_prob = sum(prob for (h, a), prob in score_probs.items() if h > a)
     draw_prob = sum(prob for (h, a), prob in score_probs.items() if h == a)
     away_win_prob = sum(prob for (h, a), prob in score_probs.items() if h < a)
+
+    # 2. 确定方向并选出与方向一致的“最佳比分”
     if home_win_prob > draw_prob and home_win_prob > away_win_prob:
         direction = "主胜"
+        # 从主胜比分中挑概率最高的
+        best_score = max([(h, a) for (h, a) in score_probs if h > a], key=lambda x: score_probs[x])
     elif away_win_prob > draw_prob:
         direction = "客胜"
+        best_score = max([(h, a) for (h, a) in score_probs if h < a], key=lambda x: score_probs[x])
     else:
         direction = "平局"
+        best_score = max([(h, a) for (h, a) in score_probs if h == a], key=lambda x: score_probs[x])
+
+    best_prob = score_probs[best_score]
+
+    # 3. 让球判断
     if direction == "主胜" and best_score[0] - best_score[1] >= 2:
         handicap = "让胜"
     elif direction == "主胜" and best_score[0] - best_score[1] == 1:
         handicap = "让平"
     else:
         handicap = "让负"
+
+    # 4. 总进球（与方向一致）
     total_goals = best_score[0] + best_score[1]
     if total_goals <= 1:
         total_goal_desc = "小球（0-1球）"
@@ -89,6 +101,7 @@ def predict_match(home, away, match_type, home_elo, away_elo, home_xg, away_xg, 
         total_goal_desc = "中球（2球）"
     else:
         total_goal_desc = "大球（3球+）"
+
     return {
         "gua": gua_name,
         "gua_desc": gua_desc,
@@ -102,7 +115,7 @@ def predict_match(home, away, match_type, home_elo, away_elo, home_xg, away_xg, 
         "home_win_prob": home_win_prob,
         "draw_prob": draw_prob,
         "away_win_prob": away_win_prob,
-        "score_probs": score_probs   # ← 修复：添加了比分概率字典
+        "score_probs": score_probs
     }
 
 # ---------- 界面布局 ----------
@@ -165,7 +178,6 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.markdown(f"<div style='font-size:48px; text-align:center;'>{result['best_score']}</div>", unsafe_allow_html=True)
         st.caption(f"模型置信度：{result['best_prob']:.2%}")
         st.subheader("📊 比分概率分布（前5）")
-        # 修复：使用 result["score_probs"] 代替未定义的 score_probs
         sorted_scores = sorted(result["score_probs"].items(), key=lambda x: x[1], reverse=True)[:5]
         for (h, a), prob in sorted_scores:
             st.progress(prob, text=f"{h}-{a} : {prob:.2%}")
