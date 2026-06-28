@@ -10,11 +10,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
-# 自定义桌面图标（PWA）
-st.markdown('''
-   <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/color/96/000000/footbal2.png">
-<link rel="icon" type="image/png" sizes="32x32" href="https://img.icons8.com/color/96/000000/footbal2.png">
-''', unsafe_allow_html=True)
 # ---------- 核心模型函数 ----------
 
 def get_gua(home, away, match_type="general"):
