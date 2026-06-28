@@ -1,5 +1,5 @@
-# V6.0 足球预测 · 32强数据完整版
-# 输入球队名称后自动填充数据，无需手动修改
+# V6.0 足球预测 · 动态比分生成版
+# 根据Elo差和xG差自动调整净胜球，每场比赛推荐不同
 
 import streamlit as st
 import math
@@ -485,6 +485,78 @@ def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patc
 def poisson_prob(lam, goals):
     return (math.exp(-lam) * (lam ** goals)) / math.factorial(goals)
 
+# ================== 核心优化：动态比分生成 ==================
+
+def generate_dynamic_score(dir_primary, goals_int, handicap_num, home_elo, away_elo, home_xg, away_xg, home_form, away_form):
+    """根据球队实力动态生成比分"""
+    # 计算实力差距
+    elo_diff = home_elo - away_elo
+    xg_diff = home_xg - away_xg
+
+    # 根据Elo差估算预期净胜球
+    if elo_diff >= 200:
+        expected_goal_diff = 3.0
+    elif elo_diff >= 150:
+        expected_goal_diff = 2.5
+    elif elo_diff >= 100:
+        expected_goal_diff = 2.0
+    elif elo_diff >= 50:
+        expected_goal_diff = 1.5
+    else:
+        expected_goal_diff = 1.0
+
+    # 用xG差微调
+    if xg_diff >= 1.5:
+        expected_goal_diff += 0.8
+    elif xg_diff >= 1.0:
+        expected_goal_diff += 0.5
+    elif xg_diff >= 0.5:
+        expected_goal_diff += 0.3
+
+    # 修正：如果xG差为负（客队进攻更强），降低预期
+    if xg_diff <= -1.0:
+        expected_goal_diff -= 0.5
+    elif xg_diff <= -0.5:
+        expected_goal_diff -= 0.3
+
+    # 四舍五入取整
+    expected_goal_diff = round(expected_goal_diff)
+    # 限制范围
+    expected_goal_diff = max(1, min(4, expected_goal_diff))
+
+    # 根据方向生成比分
+    if dir_primary == "主胜":
+        if handicap_num >= 0:  # 主队让球或平手
+            if expected_goal_diff >= 3:
+                if goals_int >= 3:
+                    return f"{expected_goal_diff}:0" if expected_goal_diff >= 3 else "3:0"
+                else:
+                    return "2:0"
+            elif expected_goal_diff >= 2:
+                return "2:0"
+            else:
+                return "1:0"
+        else:  # 主队受让
+            # 主队受让时，主胜通常是小胜或大胜但不影响结果
+            if goals_int >= 3:
+                return "2:1"
+            else:
+                return "1:0"
+    elif dir_primary == "客胜":
+        # 客胜时，根据客队实力差距决定净胜球
+        if handicap_num <= 0:  # 主队受让或平手
+            if expected_goal_diff >= 2:
+                return f"0:{expected_goal_diff}" if expected_goal_diff >= 2 else "0:2"
+            else:
+                return "0:1"
+        else:  # 主队让球，客胜通常净胜1球
+            return "0:1"
+    else:  # 平局
+        if goals_int >= 2:
+            return "1:1"
+        else:
+            return "0:0"
+
 # ================== 四层推演 ==================
 
 def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_xg, home_form, away_form,
@@ -550,47 +622,23 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     if xg_sum >= 6.5:
         goal_primary = "5"; goal_secondary = "7+"
 
-    # ----- 比分 -----
+    # ----- 动态比分生成 -----
     goal_prim_int = int(goal_primary) if goal_primary.isdigit() else 0
     goal_sec_int = int(goal_secondary) if goal_secondary.isdigit() else 0
 
-    def generate_score(dir, goals_int, hc_num):
-        if dir == "主胜":
-            if hc_num >= 0:
-                if hc_num == 1:
-                    if goals_int >= 2:
-                        return "2:0" if goals_int == 2 else "3:0" if goals_int == 3 else "3:1"
-                    else:
-                        return "1:0"
-                elif hc_num == 2:
-                    if goals_int >= 3:
-                        return "3:0" if goals_int == 3 else "4:0" if goals_int == 4 else "4:1"
-                    else:
-                        return "2:0" if goals_int == 2 else "1:0"
-                else:
-                    return "2:0" if goals_int >= 2 else "1:0"
-            else:
-                if goals_int >= 2:
-                    return "2:1" if goals_int == 2 else "3:1" if goals_int == 3 else "3:2"
-                else:
-                    return "1:0"
-        elif dir == "平局":
-            return "1:1" if goals_int >= 2 else "0:0" if goals_int == 0 else "1:1"
-        else:
-            if hc_num >= 0:
-                if goals_int >= 2:
-                    return "0:2" if goals_int == 2 else "0:3" if goals_int == 3 else "1:3"
-                else:
-                    return "0:2"
-            else:
-                if goals_int >= 2:
-                    return "0:2" if goals_int == 2 else "0:3" if goals_int == 3 else "1:3"
-                else:
-                    return "0:1"
+    # 首推比分：使用方向首推 + 总进球首推 + 动态计算
+    score_primary = generate_dynamic_score(
+        dir_primary, goal_prim_int, handicap_num,
+        home_elo, away_elo, home_xg, away_xg, home_form, away_form
+    )
 
-    score_primary = generate_score(dir_primary, goal_prim_int, handicap_num)
-    score_secondary = generate_score(dir_primary, goal_sec_int, handicap_num)
+    # 次推比分：使用方向首推 + 总进球次推 + 动态计算
+    score_secondary = generate_dynamic_score(
+        dir_primary, goal_sec_int, handicap_num,
+        home_elo, away_elo, home_xg, away_xg, home_form, away_form
+    )
 
+    # 调整次推比分与方向次推一致
     def adjust_score_by_dir(score, dir):
         h, a = map(int, score.split(':'))
         if dir == "主胜" and h <= a:
@@ -602,6 +650,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         return score
     score_secondary = adjust_score_by_dir(score_secondary, dir_secondary)
 
+    # 计算让球结果
     def calc_handicap(score, handicap):
         h, a = map(int, score.split(':'))
         if handicap >= 0:
@@ -652,8 +701,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 32强数据版")
-st.caption("输入球队名称自动填充数据，无需手动修改")
+st.title("⚽ V6.0 足球预测 · 动态比分版")
+st.caption("根据Elo和xG差值动态生成比分，每场比赛推荐不同")
 
 # ---------- 输入区 ----------
 with st.expander("📋 球队与赔率基础数据", expanded=True):
@@ -661,7 +710,6 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
     with col1:
         st.subheader("主队")
         home = st.text_input("球队名称", placeholder="如：巴西", key="home")
-        # 自动填充数据
         if home in TEAM_DATA:
             home_elo_val = TEAM_DATA[home]["elo"]
             home_xg_val = TEAM_DATA[home]["xg"]
@@ -845,6 +893,11 @@ if st.button("🔮 开始推演", use_container_width=True):
         else:
             handicap_desc = "平手"
 
+        # 显示实力差距
+        elo_diff = home_elo - away_elo
+        xg_diff = home_xg - away_xg
+        st.caption(f"实力对比：Elo差 {elo_diff:+d}，xG差 {xg_diff:+.2f}")
+
         st.markdown(f"""
         <div class="four-step">
             <div class="step-card">
@@ -890,4 +943,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 32强数据版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 动态比分版")
