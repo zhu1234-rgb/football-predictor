@@ -1,5 +1,5 @@
-# V6.0 足球预测 · 独立笔画起卦 + 比赛性质影响状态
-# 卦象仅由主客队名称笔画决定，比赛性质用于调整战意等参数
+# V6.0 足球预测 · 最终完整版
+# 笔画起卦 · 精确让球匹配 · 补丁融合 · 比赛时间
 
 import streamlit as st
 import math
@@ -232,10 +232,9 @@ def get_shichen_from_time(match_time):
     shichen_index = (hour + 1) // 2 % 12
     return SHICHEN[shichen_index]
 
-# ================== 笔画起卦函数（核心，不受比赛性质影响） ==================
+# ================== 笔画起卦函数 ==================
 
 def count_strokes(name):
-    """计算简体中文真实笔画数（内置常用汉字笔画库）"""
     stroke_dict = {
         "德": 15, "国": 8, "西": 6, "班": 10, "牙": 4,
         "南": 9, "非": 8, "加": 5, "拿": 10, "大": 3,
@@ -270,68 +269,41 @@ def count_strokes(name):
         if char in stroke_dict:
             total += stroke_dict[char]
         else:
-            total += 5  # 未知汉字默认5画
+            total += 5
     return total
 
 def generate_gua_info(home, away):
-    """完全基于笔画起卦，不受比赛性质影响"""
     clean_home = re.sub(r'[^\u4e00-\u9fa5]', '', home)
     clean_away = re.sub(r'[^\u4e00-\u9fa5]', '', away)
-    
     home_strokes = count_strokes(clean_home)
     away_strokes = count_strokes(clean_away)
     total_strokes = home_strokes + away_strokes
-    
     upper_num = home_strokes % 8
-    if upper_num == 0:
-        upper_num = 8
+    if upper_num == 0: upper_num = 8
     lower_num = away_strokes % 8
-    if lower_num == 0:
-        lower_num = 8
+    if lower_num == 0: lower_num = 8
     moving_yao = total_strokes % 6
-    if moving_yao == 0:
-        moving_yao = 6
-    
-    num_to_gua = {
-        1: "乾", 2: "兑", 3: "离", 4: "震",
-        5: "巽", 6: "坎", 7: "艮", 8: "坤"
-    }
-    
+    if moving_yao == 0: moving_yao = 6
+    num_to_gua = {1:"乾",2:"兑",3:"离",4:"震",5:"巽",6:"坎",7:"艮",8:"坤"}
     upper = num_to_gua.get(upper_num, "乾")
     lower = num_to_gua.get(lower_num, "乾")
-    
     reverse = {"乾":"坤","坤":"乾","震":"巽","巽":"震","坎":"离","离":"坎","艮":"兑","兑":"艮"}
     change_upper = reverse.get(upper, upper)
     change_lower = reverse.get(lower, lower)
-    
     inter_upper = "坎" if upper != "坤" else "坤"
     inter_lower = "离" if lower != "坤" else "坤"
-    
-    body = upper
-    use = lower
-    body_wuxing = get_wuxing(body)
-    use_wuxing = get_wuxing(use)
-    
+    body = upper; use = lower
+    body_wuxing = get_wuxing(body); use_wuxing = get_wuxing(use)
     if body_wuxing == use_wuxing:
         ti_yong = "比和（平局相）"
-    elif (body_wuxing == "木" and use_wuxing == "土") or \
-         (body_wuxing == "火" and use_wuxing == "金") or \
-         (body_wuxing == "土" and use_wuxing == "水") or \
-         (body_wuxing == "金" and use_wuxing == "木") or \
-         (body_wuxing == "水" and use_wuxing == "火"):
+    elif (body_wuxing == "木" and use_wuxing == "土") or (body_wuxing == "火" and use_wuxing == "金") or (body_wuxing == "土" and use_wuxing == "水") or (body_wuxing == "金" and use_wuxing == "木") or (body_wuxing == "水" and use_wuxing == "火"):
         ti_yong = "体克用（主队制胜）"
-    elif (use_wuxing == "木" and body_wuxing == "土") or \
-         (use_wuxing == "火" and body_wuxing == "金") or \
-         (use_wuxing == "土" and body_wuxing == "水") or \
-         (use_wuxing == "金" and body_wuxing == "木") or \
-         (use_wuxing == "水" and body_wuxing == "火"):
+    elif (use_wuxing == "木" and body_wuxing == "土") or (use_wuxing == "火" and body_wuxing == "金") or (use_wuxing == "土" and body_wuxing == "水") or (use_wuxing == "金" and body_wuxing == "木") or (use_wuxing == "水" and body_wuxing == "火"):
         ti_yong = "用克体（客队制胜）"
     else:
         ti_yong = "相生（平和）"
-    
     shi_yao = moving_yao - 1
     ying_yao = (shi_yao + 4) % 6
-    
     return {
         "base": (upper, lower),
         "base_key": upper + lower,
@@ -340,20 +312,17 @@ def generate_gua_info(home, away):
         "change_name": f"{BAGUA_LEIXIANG[change_upper]}{BAGUA_LEIXIANG[change_lower]}",
         "inter": (inter_upper, inter_lower),
         "inter_name": f"{BAGUA_LEIXIANG[inter_upper]}{BAGUA_LEIXIANG[inter_lower]}",
-        "body": body,
-        "use": use,
-        "body_wuxing": body_wuxing,
-        "use_wuxing": use_wuxing,
+        "body": body, "use": use,
+        "body_wuxing": body_wuxing, "use_wuxing": use_wuxing,
         "ti_yong": ti_yong,
-        "shi_yao": shi_yao,
-        "ying_yao": ying_yao,
+        "shi_yao": shi_yao, "ying_yao": ying_yao,
         "moving_yao": moving_yao,
         "home_strokes": home_strokes,
         "away_strokes": away_strokes,
         "total_strokes": total_strokes
     }
 
-# ================== 爻辞分析（包含比赛性质场景） ==================
+# ================== 爻辞分析 ==================
 
 def analyze_yao(gua_info, match_type, home, away):
     body_wuxing = gua_info["body_wuxing"]
@@ -373,7 +342,6 @@ def analyze_yao(gua_info, match_type, home, away):
         else:
             jixiong = "平（比和）"
 
-        # 基础爻辞（通用）
         if i == 0:
             text = f"**初爻（根基）**：{home}的初始战术部署与防守稳固性。"
             text += " 此爻为全卦之基，主队开局状态与第一道防线。宜静不宜动，静则稳，动则生变。"
@@ -395,7 +363,6 @@ def analyze_yao(gua_info, match_type, home, away):
             if match_type in ["final", "knockout"]:
                 text += " 加时赛或点球大战的可能性需纳入考虑。"
 
-        # 六亲补充 + 比赛性质影响
         if liuqin == "官鬼":
             if match_type == "knockout":
                 text += " 官鬼在淘汰赛主压力，宜有子孙解忧。"
@@ -451,7 +418,7 @@ def full_gua_analysis(home, away, match_type):
         "bing_yao": bing_yao
     }
 
-# ================== 量化计算（比赛性质影响参数） ==================
+# ================== 量化计算 ==================
 
 def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, match_type):
     elo_factor = (home_elo - away_elo) / 2000 * 0.4
@@ -460,34 +427,30 @@ def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patc
     lam_h = max(0.3, elo_factor + xg_factor + form_factor)
     lam_a = max(0.3, -elo_factor + (away_xg / (home_xg + away_xg + 0.01)) * 0.4 + (away_form - home_form) * 0.1 + 0.5)
 
-    # 补丁①：轮换
     if patches.get("home_rotation", 0) >= 4:
         lam_h *= 0.5
     if patches.get("away_rotation", 0) >= 4:
         lam_a *= 0.5
 
-    # 补丁⑤：屠杀局（强弱悬殊，但决赛/淘汰赛更谨慎）
     if home_xg >= 2.5 and away_xg <= 0.8:
         if match_type in ["final", "knockout"]:
-            lam_h *= 1.5  # 谨慎屠杀
+            lam_h *= 1.5
         else:
             lam_h *= 2.0
         lam_a *= 0.6
 
-    # 比赛性质影响总进球预期（用于后续）
     return round(lam_h, 2), round(lam_a, 2)
 
 def poisson_prob(lam, goals):
     return (math.exp(-lam) * (lam ** goals)) / math.factorial(goals)
 
-# ================== 四层推演（比赛性质影响） ==================
+# ================== 四层推演（精确让球匹配） ==================
 
 def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_xg, home_form, away_form,
                       handicap_num, patches):
     elo_diff = home_elo - away_elo
     xg_sum = home_xg + away_xg
 
-    # 补丁②：打平即可出线
     if patches.get("draw_to_advance") == "home":
         draw_boost = 0.15
         xg_sum = xg_sum * 0.9
@@ -497,33 +460,27 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     else:
         draw_boost = 0.0
 
-    # 补丁③：诱大警报
     if patches.get("odds_up", False):
         xg_sum = max(0.5, xg_sum - 0.5)
 
-    # 比赛性质对总进球的修正
     if match_type == "final":
-        xg_sum = xg_sum * 0.85  # 决赛更保守
+        xg_sum = xg_sum * 0.85
     elif match_type == "knockout":
-        xg_sum = xg_sum * 0.9   # 淘汰赛谨慎
+        xg_sum = xg_sum * 0.9
     elif match_type == "slaughter":
-        xg_sum = xg_sum * 1.1   # 强弱悬殊可能大比分
+        xg_sum = xg_sum * 1.1
 
-    # ----- 第一步 -----
+    # ----- 第一步：胜平负 -----
     if abs(elo_diff) > 150:
         if elo_diff > 0:
-            dir_primary = "主胜"
-            dir_secondary = "平局"
+            dir_primary = "主胜"; dir_secondary = "平局"
         else:
-            dir_primary = "客胜"
-            dir_secondary = "平局"
+            dir_primary = "客胜"; dir_secondary = "平局"
     elif abs(elo_diff) >= 50:
         if home_xg > away_xg and home_form >= away_form:
-            dir_primary = "主胜"
-            dir_secondary = "平局"
+            dir_primary = "主胜"; dir_secondary = "平局"
         elif away_xg > home_xg and away_form >= home_form:
-            dir_primary = "客胜"
-            dir_secondary = "平局"
+            dir_primary = "客胜"; dir_secondary = "平局"
         else:
             dir_primary = "平局"
             dir_secondary = "主胜" if home_xg > away_xg else "客胜"
@@ -535,85 +492,49 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         if dir_primary != "平局" and abs(home_xg - away_xg) < 0.3:
             dir_primary, dir_secondary = "平局", dir_primary
 
-    # 决赛/淘汰赛平局概率上升
     if match_type in ["final", "knockout"]:
         if dir_primary == "主胜" and abs(home_xg - away_xg) < 0.5:
             dir_primary, dir_secondary = "平局", dir_primary
 
-    # ----- 第二步：让球 -----
-    expected_goal_diff = home_xg - away_xg
-    if patches.get("home_rotation", 0) >= 4:
-        expected_goal_diff -= 0.5
-    if patches.get("away_rotation", 0) >= 4:
-        expected_goal_diff += 0.5
-    if patches.get("draw_to_advance") in ["home", "away"]:
-        expected_goal_diff = min(0.5, max(-0.5, expected_goal_diff))
-    if match_type in ["final", "knockout"]:
-        expected_goal_diff = min(0.5, max(-0.5, expected_goal_diff))
-
-    if expected_goal_diff > handicap_num + 0.5:
-        handicap_primary = "让胜"
-    elif expected_goal_diff > handicap_num - 0.5 and expected_goal_diff < handicap_num + 0.5:
-        handicap_primary = "让平"
-    else:
-        handicap_primary = "让负"
-
-    if handicap_primary == "让胜":
-        handicap_secondary = "让平"
-    elif handicap_primary == "让平":
-        handicap_secondary = "让胜" if expected_goal_diff > 0 else "让负"
-    else:
-        handicap_secondary = "让平"
-
     # ----- 第三步：总进球 -----
     if xg_sum >= 3.5:
-        goal_primary = "3"
-        goal_secondary = "4"
+        goal_primary = "3"; goal_secondary = "4"
     elif xg_sum >= 2.5:
-        goal_primary = "2"
-        goal_secondary = "3"
+        goal_primary = "2"; goal_secondary = "3"
     elif xg_sum >= 1.5:
-        goal_primary = "1"
-        goal_secondary = "2"
+        goal_primary = "1"; goal_secondary = "2"
     else:
-        goal_primary = "0"
-        goal_secondary = "1"
+        goal_primary = "0"; goal_secondary = "1"
     if xg_sum >= 4.0 and goal_primary == "3":
         goal_secondary = "4"
     if xg_sum >= 5.0 and goal_primary == "4":
         goal_secondary = "5"
     if xg_sum >= 6.5:
-        goal_primary = "5"
-        goal_secondary = "7+"
+        goal_primary = "5"; goal_secondary = "7+"
 
-    # ----- 第四步：比分 -----
-    def generate_score(dir, hc, goals, is_primary=True):
+    # ----- 第四步：生成比分首推和次推 -----
+    def generate_score(dir, goals, is_primary=True):
         if dir == "主胜":
-            if hc == "让胜":
-                if goals == "2": return "2:0"
-                elif goals == "3": return "3:0" if is_primary else "3:1"
-                elif goals == "4": return "3:1"
-                elif goals == "5": return "4:1"
-                else: return "2:0"
-            else:
-                if goals == "1": return "1:0"
-                elif goals == "2": return "2:1"
-                elif goals == "3": return "2:1"
-                else: return "1:0"
+            if goals == "1": return "1:0"
+            elif goals == "2": return "2:0"
+            elif goals == "3": return "3:0"
+            elif goals == "4": return "3:1"
+            elif goals == "5": return "4:1"
+            else: return "2:0"
         elif dir == "平局":
             if goals == "0": return "0:0"
             elif goals == "1": return "1:1"
             elif goals == "2": return "1:1" if is_primary else "2:2"
             else: return "1:1"
-        else:
+        else:  # 客胜
             if goals == "1": return "0:1"
             elif goals == "2": return "0:2"
             elif goals == "3": return "1:2"
             else: return "0:1"
 
-    score_primary = generate_score(dir_primary, handicap_primary, goal_primary, True)
-    score_secondary = generate_score(dir_primary, handicap_primary, goal_secondary, False)
-
+    score_primary = generate_score(dir_primary, goal_primary, True)
+    score_secondary = generate_score(dir_primary, goal_secondary, False)
+    # 调整次推比分与方向次推一致
     def adjust_score(dir, score):
         h, a = map(int, score.split(':'))
         if dir == "主胜" and h <= a:
@@ -623,8 +544,26 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         elif dir == "平局" and h != a:
             return "1:1"
         return score
-
     score_secondary = adjust_score(dir_secondary, score_secondary)
+
+    # ----- 根据比分计算让球结果（核心规则） -----
+    def calc_handicap(score, handicap):
+        h, a = map(int, score.split(':'))
+        if handicap >= 0:  # 主队让球
+            virtual_h = h - handicap
+            virtual_a = a
+        else:  # 主队受让
+            virtual_h = h + (-handicap)
+            virtual_a = a
+        if virtual_h > virtual_a:
+            return "让胜"
+        elif virtual_h == virtual_a:
+            return "让平"
+        else:
+            return "让负"
+
+    handicap_primary = calc_handicap(score_primary, handicap_num)
+    handicap_secondary = calc_handicap(score_secondary, handicap_num)
 
     return {
         "direction_primary": dir_primary,
@@ -655,8 +594,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 独立笔画起卦")
-st.caption("卦象由队伍笔画决定 · 比赛性质影响状态参数")
+st.title("⚽ V6.0 足球预测 · 完整版")
+st.caption("卦象由队伍笔画决定 · 比赛性质影响状态参数 · 让球精确匹配")
 
 # ---------- 输入区 ----------
 with st.expander("📋 球队与赔率基础数据", expanded=True):
@@ -674,7 +613,6 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
         away_xg = st.number_input("xG", value=1.2, step=0.1, key="away_xg")
         away_form = st.number_input("近5场胜率", value=0.5, step=0.05, key="away_form")
 
-    # 比赛日期和时间
     match_date = st.date_input("比赛日期", value=datetime.date.today())
     match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
     match_time = datetime.datetime.combine(match_date, match_time_sel)
@@ -708,7 +646,6 @@ with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
         st.caption("补丁④（半场落后≥2球）需临场数据，暂不设开关。")
         st.caption("补丁⑤（屠杀局）根据xG和比赛性质自动调整。")
 
-# 比赛性质（独立于起卦）
 match_type = st.selectbox("比赛性质（影响状态参数）", ["常规", "淘汰赛", "决赛", "保级/出线生死战", "强弱悬殊"])
 
 if st.button("🔮 开始推演", use_container_width=True):
@@ -716,11 +653,8 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.warning("请填写主客队名称")
     else:
         match_type_map = {
-            "常规": "general",
-            "淘汰赛": "knockout",
-            "决赛": "final",
-            "保级/出线生死战": "draw",
-            "强弱悬殊": "slaughter"
+            "常规": "general", "淘汰赛": "knockout", "决赛": "final",
+            "保级/出线生死战": "draw", "强弱悬殊": "slaughter"
         }
         mt_key = match_type_map[match_type]
 
@@ -731,7 +665,7 @@ if st.button("🔮 开始推演", use_container_width=True):
             "odds_up": odds_up,
         }
 
-        # ========== 第一阶段：卦象分析（独立笔画起卦） ==========
+        # ========== 第一阶段：卦象分析 ==========
         st.divider()
         st.markdown("## 🔮 第一阶段：卦象分析（笔画起卦）")
         
@@ -759,9 +693,9 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write("**💊 病药体系**：" + bing_yao['病药'])
         st.write(f"用神：{bing_yao['用神']} | 忌神：{bing_yao['忌神']} | 元神：{bing_yao['元神']} | 仇神：{bing_yao['仇神']}")
 
-        # ========== 第二阶段：古代杂占辅助 ==========
+        # ========== 第二阶段：古代杂占 ==========
         st.divider()
-        st.markdown("## 📜 第二阶段：古代杂占 · 六爻知识辅助")
+        st.markdown("## 📜 第二阶段：古代杂占")
         
         shichen = get_shichen_from_time(match_time)
         shichen_time = ['23-1','1-3','3-5','5-7','7-9','9-11','11-13','13-15','15-17','17-19','19-21','21-23']
@@ -785,7 +719,7 @@ if st.button("🔮 开始推演", use_container_width=True):
 
         # ========== 第三阶段：量化计算 ==========
         st.divider()
-        st.markdown("## 📊 第三阶段：量化计算（含补丁①⑤）")
+        st.markdown("## 📊 第三阶段：量化计算")
 
         lam_h, lam_a = compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, mt_key)
         home_prob = 0
@@ -808,7 +742,7 @@ if st.button("🔮 开始推演", use_container_width=True):
 
         # ========== 第四阶段：四层推演 ==========
         st.divider()
-        st.markdown("## 🎯 第四阶段：四层推演结论（竞彩完整选项）")
+        st.markdown("## 🎯 第四阶段：四层推演结论")
 
         result = four_step_predict(
             home, away, mt_key,
@@ -819,6 +753,14 @@ if st.button("🔮 开始推演", use_container_width=True):
             patches
         )
 
+        # 让球显示文字
+        if handicap_num > 0:
+            handicap_desc = f"主队让{handicap_num}球"
+        elif handicap_num < 0:
+            handicap_desc = f"主队受让{-handicap_num}球"
+        else:
+            handicap_desc = "平手"
+
         st.markdown(f"""
         <div class="four-step">
             <div class="step-card">
@@ -827,7 +769,7 @@ if st.button("🔮 开始推演", use_container_width=True):
                 <span class="step-secondary">次推：{result['direction_secondary']}</span>
             </div>
             <div class="step-card">
-                <span class="step-number">② 让球胜平负（让{handicap_num}球）</span><br>
+                <span class="step-number">② 让球胜平负（{handicap_desc}）</span><br>
                 <span class="step-primary">首推：{result['handicap_primary']}</span><br>
                 <span class="step-secondary">次推：{result['handicap_secondary']}</span>
             </div>
@@ -864,4 +806,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 独立笔画起卦版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 最终完整版")
