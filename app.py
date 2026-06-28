@@ -1,5 +1,5 @@
-# V6.0 足球预测 · 笔画起卦版（完整最终版）
-# 包含：补丁①~⑤、自定义让球、比赛时间、四层推演、卦辞/杂占/爻辞
+# V6.0 足球预测 · 独立笔画起卦 + 比赛性质影响状态
+# 卦象仅由主客队名称笔画决定，比赛性质用于调整战意等参数
 
 import streamlit as st
 import math
@@ -23,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ================== 第一阶段：卦象分析核心库 ==================
+# ================== 核心库 ==================
 
 BAGUA_WUXING = {
     "乾": "金", "兑": "金", "离": "火", "震": "木",
@@ -126,7 +126,7 @@ def get_liuqin(body_wuxing, yao_wuxing):
     }
     return relations.get((body_wuxing, yao_wuxing), "比和")
 
-# ================== 第二阶段：古代杂占（完整） ==================
+# ================== 古代杂占（完整） ==================
 
 SHICHEN = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
 
@@ -232,12 +232,11 @@ def get_shichen_from_time(match_time):
     shichen_index = (hour + 1) // 2 % 12
     return SHICHEN[shichen_index]
 
-# ================== 笔画起卦函数（核心改进） ==================
+# ================== 笔画起卦函数（核心，不受比赛性质影响） ==================
 
 def count_strokes(name):
-    """计算简体中文真实笔画数（内置常用国家队汉字笔画库）"""
+    """计算简体中文真实笔画数（内置常用汉字笔画库）"""
     stroke_dict = {
-        # 常见足球国家/地区名称
         "德": 15, "国": 8, "西": 6, "班": 10, "牙": 4,
         "南": 9, "非": 8, "加": 5, "拿": 10, "大": 3,
         "巴": 4, "西": 6, "阿": 7, "根": 10, "廷": 6,
@@ -271,16 +270,11 @@ def count_strokes(name):
         if char in stroke_dict:
             total += stroke_dict[char]
         else:
-            # 未知汉字默认5画
-            total += 5
+            total += 5  # 未知汉字默认5画
     return total
 
-def generate_gua_info(match_type, home, away):
-    """
-    利用主客队名称的简体中文笔画数起卦（梅花易数法）
-    你输入什么，就用什么计算，不加任何映射转换
-    """
-    # 去除空格、括号等符号，只保留汉字
+def generate_gua_info(home, away):
+    """完全基于笔画起卦，不受比赛性质影响"""
     clean_home = re.sub(r'[^\u4e00-\u9fa5]', '', home)
     clean_away = re.sub(r'[^\u4e00-\u9fa5]', '', away)
     
@@ -288,7 +282,6 @@ def generate_gua_info(match_type, home, away):
     away_strokes = count_strokes(clean_away)
     total_strokes = home_strokes + away_strokes
     
-    # 梅花易数起卦法
     upper_num = home_strokes % 8
     if upper_num == 0:
         upper_num = 8
@@ -360,10 +353,9 @@ def generate_gua_info(match_type, home, away):
         "total_strokes": total_strokes
     }
 
-# ================== 第一阶段函数 ==================
+# ================== 爻辞分析（包含比赛性质场景） ==================
 
 def analyze_yao(gua_info, match_type, home, away):
-    """详细六爻分析，融合足球场景"""
     body_wuxing = gua_info["body_wuxing"]
     wuxing_cycle = ["木", "火", "土", "金", "水", "木"]
     yao_details = []
@@ -381,6 +373,7 @@ def analyze_yao(gua_info, match_type, home, away):
         else:
             jixiong = "平（比和）"
 
+        # 基础爻辞（通用）
         if i == 0:
             text = f"**初爻（根基）**：{home}的初始战术部署与防守稳固性。"
             text += " 此爻为全卦之基，主队开局状态与第一道防线。宜静不宜动，静则稳，动则生变。"
@@ -399,9 +392,17 @@ def analyze_yao(gua_info, match_type, home, away):
         else:
             text = f"**上爻（终局）**：比赛最终走向与运气成分。"
             text += " 上爻为天位，主结果与偶然因素。此爻临吉则好运相伴，临凶则恐有意外变数。"
+            if match_type in ["final", "knockout"]:
+                text += " 加时赛或点球大战的可能性需纳入考虑。"
 
+        # 六亲补充 + 比赛性质影响
         if liuqin == "官鬼":
-            text += f" 官鬼临爻，{away}的中场施压或裁判尺度可能成为关键变量。"
+            if match_type == "knockout":
+                text += " 官鬼在淘汰赛主压力，宜有子孙解忧。"
+            elif match_type == "final":
+                text += " 官鬼在决赛主心理压力，谁先放下包袱谁占优。"
+            else:
+                text += f" 官鬼临爻，{away}的中场施压或裁判尺度可能成为关键变量。"
         elif liuqin == "妻财":
             text += f" 妻财临爻，{home}的锋线终结能力将直接决定比分。"
         elif liuqin == "兄弟":
@@ -424,6 +425,8 @@ def analyze_yao(gua_info, match_type, home, away):
 def get_bing_yao(match_type):
     if match_type == "knockout":
         bing = "淘汰赛官鬼为病，宜有子孙制之。"
+    elif match_type == "final":
+        bing = "决赛双方皆谨慎，比和为主，病在谁先犯错。"
     elif match_type == "draw":
         bing = "平局相，比和为主，病在攻守失衡。"
     elif match_type == "slaughter":
@@ -438,8 +441,8 @@ def get_bing_yao(match_type):
         "病药": bing
     }
 
-def full_gua_analysis(match_type, home, away):
-    gua_info = generate_gua_info(match_type, home, away)
+def full_gua_analysis(home, away, match_type):
+    gua_info = generate_gua_info(home, away)
     yao_details = analyze_yao(gua_info, match_type, home, away)
     bing_yao = get_bing_yao(match_type)
     return {
@@ -448,36 +451,43 @@ def full_gua_analysis(match_type, home, away):
         "bing_yao": bing_yao
     }
 
-# ================== 第三阶段：量化计算 ==================
+# ================== 量化计算（比赛性质影响参数） ==================
 
-def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches):
+def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, match_type):
     elo_factor = (home_elo - away_elo) / 2000 * 0.4
     xg_factor = (home_xg / (home_xg + away_xg + 0.01)) * 0.4
     form_factor = (home_form - away_form) * 0.1 + 0.5
     lam_h = max(0.3, elo_factor + xg_factor + form_factor)
     lam_a = max(0.3, -elo_factor + (away_xg / (home_xg + away_xg + 0.01)) * 0.4 + (away_form - home_form) * 0.1 + 0.5)
 
+    # 补丁①：轮换
     if patches.get("home_rotation", 0) >= 4:
         lam_h *= 0.5
     if patches.get("away_rotation", 0) >= 4:
         lam_a *= 0.5
 
+    # 补丁⑤：屠杀局（强弱悬殊，但决赛/淘汰赛更谨慎）
     if home_xg >= 2.5 and away_xg <= 0.8:
-        lam_h *= 2.0
+        if match_type in ["final", "knockout"]:
+            lam_h *= 1.5  # 谨慎屠杀
+        else:
+            lam_h *= 2.0
         lam_a *= 0.6
 
+    # 比赛性质影响总进球预期（用于后续）
     return round(lam_h, 2), round(lam_a, 2)
 
 def poisson_prob(lam, goals):
     return (math.exp(-lam) * (lam ** goals)) / math.factorial(goals)
 
-# ================== 第四阶段：四层推演（含补丁②③、自定义让球） ==================
+# ================== 四层推演（比赛性质影响） ==================
 
 def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_xg, home_form, away_form,
                       handicap_num, patches):
     elo_diff = home_elo - away_elo
     xg_sum = home_xg + away_xg
 
+    # 补丁②：打平即可出线
     if patches.get("draw_to_advance") == "home":
         draw_boost = 0.15
         xg_sum = xg_sum * 0.9
@@ -487,8 +497,17 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     else:
         draw_boost = 0.0
 
+    # 补丁③：诱大警报
     if patches.get("odds_up", False):
         xg_sum = max(0.5, xg_sum - 0.5)
+
+    # 比赛性质对总进球的修正
+    if match_type == "final":
+        xg_sum = xg_sum * 0.85  # 决赛更保守
+    elif match_type == "knockout":
+        xg_sum = xg_sum * 0.9   # 淘汰赛谨慎
+    elif match_type == "slaughter":
+        xg_sum = xg_sum * 1.1   # 强弱悬殊可能大比分
 
     # ----- 第一步 -----
     if abs(elo_diff) > 150:
@@ -516,13 +535,20 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         if dir_primary != "平局" and abs(home_xg - away_xg) < 0.3:
             dir_primary, dir_secondary = "平局", dir_primary
 
-    # ----- 第二步 -----
+    # 决赛/淘汰赛平局概率上升
+    if match_type in ["final", "knockout"]:
+        if dir_primary == "主胜" and abs(home_xg - away_xg) < 0.5:
+            dir_primary, dir_secondary = "平局", dir_primary
+
+    # ----- 第二步：让球 -----
     expected_goal_diff = home_xg - away_xg
     if patches.get("home_rotation", 0) >= 4:
         expected_goal_diff -= 0.5
     if patches.get("away_rotation", 0) >= 4:
         expected_goal_diff += 0.5
     if patches.get("draw_to_advance") in ["home", "away"]:
+        expected_goal_diff = min(0.5, max(-0.5, expected_goal_diff))
+    if match_type in ["final", "knockout"]:
         expected_goal_diff = min(0.5, max(-0.5, expected_goal_diff))
 
     if expected_goal_diff > handicap_num + 0.5:
@@ -539,7 +565,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     else:
         handicap_secondary = "让平"
 
-    # ----- 第三步 -----
+    # ----- 第三步：总进球 -----
     if xg_sum >= 3.5:
         goal_primary = "3"
         goal_secondary = "4"
@@ -560,7 +586,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         goal_primary = "5"
         goal_secondary = "7+"
 
-    # ----- 第四步 -----
+    # ----- 第四步：比分 -----
     def generate_score(dir, hc, goals, is_primary=True):
         if dir == "主胜":
             if hc == "让胜":
@@ -629,8 +655,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 笔画起卦版")
-st.caption("卦象定方向 · 补丁调参数 · 量化定概率 · 四层推演出结论")
+st.title("⚽ V6.0 足球预测 · 独立笔画起卦")
+st.caption("卦象由队伍笔画决定 · 比赛性质影响状态参数")
 
 # ---------- 输入区 ----------
 with st.expander("📋 球队与赔率基础数据", expanded=True):
@@ -670,8 +696,8 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
     with col_odds[2]:
         st.caption("总进球/比分（已内嵌）")
 
-# ---------- 补丁设置 ----------
-with st.expander("🔧 补丁设置（轮换、打平出线、大小球升盘等）", expanded=False):
+# ---------- 补丁和比赛性质 ----------
+with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         home_rotation = st.number_input("主队轮换人数（≥4触发补丁①）", min_value=0, max_value=11, value=0, step=1)
@@ -679,16 +705,23 @@ with st.expander("🔧 补丁设置（轮换、打平出线、大小球升盘等
         draw_to_advance = st.selectbox("打平即可出线（补丁②）", options=["无", "主队", "客队"], index=0)
         odds_up = st.checkbox("大小球盘口升盘（补丁③诱大警报）", value=False)
     with col_p2:
-        st.caption("补丁④（半场落后≥2球）需临场数据，暂不设开关，默认关闭。")
-        st.caption("补丁⑤（屠杀局）根据xG自动触发，无需手动。")
+        st.caption("补丁④（半场落后≥2球）需临场数据，暂不设开关。")
+        st.caption("补丁⑤（屠杀局）根据xG和比赛性质自动调整。")
 
-match_type = st.selectbox("比赛性质", ["常规", "淘汰赛", "保级/出线生死战", "强弱悬殊"])
+# 比赛性质（独立于起卦）
+match_type = st.selectbox("比赛性质（影响状态参数）", ["常规", "淘汰赛", "决赛", "保级/出线生死战", "强弱悬殊"])
 
 if st.button("🔮 开始推演", use_container_width=True):
     if not home or not away:
         st.warning("请填写主客队名称")
     else:
-        match_type_map = {"常规": "general", "淘汰赛": "knockout", "保级/出线生死战": "draw", "强弱悬殊": "slaughter"}
+        match_type_map = {
+            "常规": "general",
+            "淘汰赛": "knockout",
+            "决赛": "final",
+            "保级/出线生死战": "draw",
+            "强弱悬殊": "slaughter"
+        }
         mt_key = match_type_map[match_type]
 
         patches = {
@@ -698,16 +731,15 @@ if st.button("🔮 开始推演", use_container_width=True):
             "odds_up": odds_up,
         }
 
-        # ========== 第一阶段：卦象分析（笔画起卦） ==========
+        # ========== 第一阶段：卦象分析（独立笔画起卦） ==========
         st.divider()
         st.markdown("## 🔮 第一阶段：卦象分析（笔画起卦）")
         
-        gua_analysis = full_gua_analysis(mt_key, home, away)
+        gua_analysis = full_gua_analysis(home, away, mt_key)
         gua_info = gua_analysis["gua_info"]
         yao_details = gua_analysis["yao_details"]
         bing_yao = gua_analysis["bing_yao"]
 
-        # 显示起卦依据
         st.caption(f"起卦依据：主队“{home}”笔画数 {gua_info['home_strokes']}，客队“{away}”笔画数 {gua_info['away_strokes']}，总笔画 {gua_info['total_strokes']}，动爻 {gua_info['moving_yao']}")
 
         col_g1, col_g2, col_g3 = st.columns(3)
@@ -755,7 +787,7 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.divider()
         st.markdown("## 📊 第三阶段：量化计算（含补丁①⑤）")
 
-        lam_h, lam_a = compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches)
+        lam_h, lam_a = compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, mt_key)
         home_prob = 0
         draw_prob = 0
         away_prob = 0
@@ -832,4 +864,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 笔画起卦版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 独立笔画起卦版")
