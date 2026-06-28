@@ -1,5 +1,6 @@
 # V6.0 足球预测 · 补丁融合 + 自定义让球 + 比赛时间版
 # 移除基础知识库，保留并丰富六爻逐爻详解，杂占依据比赛时间
+# 修正：用 st.date_input + st.time_input 替代不存在的 st.datetime_input
 
 import streamlit as st
 import math
@@ -295,7 +296,6 @@ def analyze_yao(gua_info, match_type, home, away):
     for i in range(6):
         yao_wuxing = wuxing_cycle[i]
         liuqin = get_liuqin(body_wuxing, yao_wuxing)
-        # 吉凶判断
         if liuqin == "父母":
             jixiong = "吉（得生）" if body_wuxing in ["火","土"] else "中"
         elif liuqin == "官鬼":
@@ -307,13 +307,12 @@ def analyze_yao(gua_info, match_type, home, away):
         else:
             jixiong = "平（比和）"
 
-        # 爻辞 - 融合足球场景 + 六爻心源风格
         if i == 0:
             text = f"**初爻（根基）**：{home}的初始战术部署与防守稳固性。"
             text += " 此爻为全卦之基，主队开局状态与第一道防线。宜静不宜动，静则稳，动则生变。"
         elif i == 1:
             text = f"**二爻（节奏）**：中场控制权与比赛节奏。"
-            text += " 二爻为内卦之中，主中场调度。若此爻得位，则{home}能掌控比赛节奏；若失位，则易被{away}反制。"
+            text += f" 二爻为内卦之中，主中场调度。若此爻得位，则{home}能掌控比赛节奏；若失位，则易被{away}反制。"
         elif i == 2:
             text = f"**三爻（攻势）**：{home}的前锋线效率与威胁球能力。"
             text += " 三爻为内卦之极，主攻端。此爻发动则攻势凌厉，然亦需防急于求成反被偷袭。"
@@ -327,7 +326,6 @@ def analyze_yao(gua_info, match_type, home, away):
             text = f"**上爻（终局）**：比赛最终走向与运气成分。"
             text += " 上爻为天位，主结果与偶然因素。此爻临吉则好运相伴，临凶则恐有意外变数。"
 
-        # 根据六亲补充
         if liuqin == "官鬼":
             text += f" 官鬼临爻，{away}的中场施压或裁判尺度可能成为关键变量。"
         elif liuqin == "妻财":
@@ -386,13 +384,11 @@ def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patc
     lam_h = max(0.3, elo_factor + xg_factor + form_factor)
     lam_a = max(0.3, -elo_factor + (away_xg / (home_xg + away_xg + 0.01)) * 0.4 + (away_form - home_form) * 0.1 + 0.5)
 
-    # 补丁①：轮换限制
     if patches.get("home_rotation", 0) >= 4:
         lam_h *= 0.5
     if patches.get("away_rotation", 0) >= 4:
         lam_a *= 0.5
 
-    # 补丁⑤：屠杀局
     if home_xg >= 2.5 and away_xg <= 0.8:
         lam_h *= 2.0
         lam_a *= 0.6
@@ -406,17 +402,9 @@ def poisson_prob(lam, goals):
 
 def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_xg, home_form, away_form,
                       handicap_num, patches):
-    """
-    patches 字典包含：
-        home_rotation: int
-        away_rotation: int
-        draw_to_advance: str  'none','home','away'
-        odds_up: bool   # 大小球升盘
-    """
     elo_diff = home_elo - away_elo
     xg_sum = home_xg + away_xg
 
-    # 应用补丁②：打平即可出线
     if patches.get("draw_to_advance") == "home":
         draw_boost = 0.15
         xg_sum = xg_sum * 0.9
@@ -426,11 +414,10 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     else:
         draw_boost = 0.0
 
-    # 补丁③：大小球升盘诱大警报
     if patches.get("odds_up", False):
         xg_sum = max(0.5, xg_sum - 0.5)
 
-    # ----- 第一步：胜平负 -----
+    # ----- 第一步 -----
     if abs(elo_diff) > 150:
         if elo_diff > 0:
             dir_primary = "主胜"
@@ -452,12 +439,11 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         dir_primary = "平局"
         dir_secondary = "主胜" if home_xg > away_xg else "客胜"
 
-    # 补丁②修正方向
     if draw_boost > 0:
         if dir_primary != "平局" and abs(home_xg - away_xg) < 0.3:
             dir_primary, dir_secondary = "平局", dir_primary
 
-    # ----- 第二步：让球（自定义让球数） -----
+    # ----- 第二步 -----
     expected_goal_diff = home_xg - away_xg
     if patches.get("home_rotation", 0) >= 4:
         expected_goal_diff -= 0.5
@@ -480,7 +466,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     else:
         handicap_secondary = "让平"
 
-    # ----- 第三步：总进球 -----
+    # ----- 第三步 -----
     if xg_sum >= 3.5:
         goal_primary = "3"
         goal_secondary = "4"
@@ -501,7 +487,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         goal_primary = "5"
         goal_secondary = "7+"
 
-    # ----- 第四步：比分 -----
+    # ----- 第四步 -----
     def generate_score(dir, hc, goals, is_primary=True):
         if dir == "主胜":
             if hc == "让胜":
@@ -589,12 +575,10 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
         away_xg = st.number_input("xG", value=1.2, step=0.1, key="away_xg")
         away_form = st.number_input("近5场胜率", value=0.5, step=0.05, key="away_form")
 
-    # 比赛时间
-    match_time = st.datetime_input(
-        "比赛开始时间（用于杂占时辰推算）",
-        value=datetime.datetime.now(),
-        format="YYYY-MM-DD HH:mm"
-    )
+    # 比赛日期和时间（分开输入，组合成 datetime）
+    match_date = st.date_input("比赛日期", value=datetime.date.today())
+    match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
+    match_time = datetime.datetime.combine(match_date, match_time_sel)
 
     st.subheader("赔率数据（可选）")
     col_odds = st.columns(3)
@@ -667,7 +651,7 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write("**💊 病药体系**：" + bing_yao['病药'])
         st.write(f"用神：{bing_yao['用神']} | 忌神：{bing_yao['忌神']} | 元神：{bing_yao['元神']} | 仇神：{bing_yao['仇神']}")
 
-        # ========== 第二阶段：古代杂占辅助（依据比赛时间） ==========
+        # ========== 第二阶段：古代杂占辅助 ==========
         st.divider()
         st.markdown("## 📜 第二阶段：古代杂占 · 六爻知识辅助")
         
