@@ -2,14 +2,10 @@ import streamlit as st
 import math
 import random
 from datetime import datetime
-
-# ⚽ 强制设置浏览器标签图标（放在最前面）
 st.markdown("""
     <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26bd.png">
     <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26bd.png">
 """, unsafe_allow_html=True)
-
-# 然后才是页面配置
 st.set_page_config(
     page_title="V14.9 预测器",
     page_icon="⚽",
