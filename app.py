@@ -1,10 +1,10 @@
-# V6.0 足球预测 · 补丁融合 + 自定义让球 + 比赛时间版
-# 移除基础知识库，保留并丰富六爻逐爻详解，杂占依据比赛时间
-# 修正：用 st.date_input + st.time_input 替代不存在的 st.datetime_input
+# V6.0 足球预测 · 笔画起卦版（完整最终版）
+# 包含：补丁①~⑤、自定义让球、比赛时间、四层推演、卦辞/杂占/爻辞
 
 import streamlit as st
 import math
 import datetime
+import re
 
 # ---------- PWA 配置 ----------
 st.markdown(
@@ -228,31 +228,97 @@ QUE_ZAO = {
 }
 
 def get_shichen_from_time(match_time):
-    """根据比赛时间获取时辰"""
     hour = match_time.hour
     shichen_index = (hour + 1) // 2 % 12
     return SHICHEN[shichen_index]
 
-# ================== 第一阶段函数 ==================
+# ================== 笔画起卦函数（核心改进） ==================
+
+def count_strokes(name):
+    """计算简体中文真实笔画数（内置常用国家队汉字笔画库）"""
+    stroke_dict = {
+        # 常见足球国家/地区名称
+        "德": 15, "国": 8, "西": 6, "班": 10, "牙": 4,
+        "南": 9, "非": 8, "加": 5, "拿": 10, "大": 3,
+        "巴": 4, "西": 6, "阿": 7, "根": 10, "廷": 6,
+        "法": 8, "意": 13, "利": 7, "英": 8, "格": 10, "兰": 5,
+        "葡": 12, "萄": 11, "牙": 4, "荷": 10, "比": 4,
+        "瑞": 13, "士": 3, "丹": 4, "麦": 7, "挪": 10, "威": 9,
+        "捷": 11, "克": 7, "奥": 12, "地": 6, "匈": 6,
+        "希": 7, "腊": 12, "俄": 9, "罗": 8, "马": 3, "尼": 5,
+        "日": 4, "本": 5, "韩": 12, "伊": 6, "朗": 10,
+        "沙": 7, "特": 10, "阿": 7, "拉": 8, "伯": 7,
+        "墨": 15, "哥": 10, "美": 9, "加": 5, "拿": 10, "大": 3,
+        "乌": 4, "拉": 8, "圭": 6, "卡": 5, "塔": 12, "尔": 5,
+        "塞": 13, "内": 4, "加": 5, "尔": 5, "尼": 5, "亚": 6,
+        "洪": 9, "都": 10, "拉": 8, "斯": 12, "哥": 10,
+        "厄": 4, "瓜": 5, "多": 6, "尔": 5,
+        "智": 12, "利": 7, "秘": 10, "鲁": 12,
+        "委": 8, "内": 4, "瑞": 13, "拉": 8,
+        "新": 13, "西": 6, "兰": 5, "澳": 15, "大": 3,
+        "中": 4, "台": 5, "港": 12, "澳": 15, "门": 3,
+        "朝": 12, "鲜": 14, "越": 12, "泰": 10, "印": 5, "度": 9,
+        "菲": 11, "律": 9, "宾": 10, "新": 13, "加": 5, "坡": 8,
+        "马": 3, "来": 7, "西": 6, "亚": 6,
+        "哥": 10, "斯": 12, "达": 6, "黎": 15, "巴": 4,
+        "嫩": 14, "以": 4, "色": 6, "列": 6, "约": 6, "旦": 5,
+        "叙": 9, "利": 7, "亚": 6, "伊": 6, "拉": 8, "克": 7,
+        "阿": 7, "曼": 11, "苏": 7, "丹": 4, "南": 9, "苏": 7,
+        "南": 9, "非": 8, "中": 4, "国": 8,
+    }
+    total = 0
+    for char in name:
+        if char in stroke_dict:
+            total += stroke_dict[char]
+        else:
+            # 未知汉字默认5画
+            total += 5
+    return total
 
 def generate_gua_info(match_type, home, away):
-    base_pool = {
-        "general": ("乾", "乾"),
-        "draw": ("坤", "坤"),
-        "knockout": ("离", "坎"),
-        "slaughter": ("震", "乾")
+    """
+    利用主客队名称的简体中文笔画数起卦（梅花易数法）
+    你输入什么，就用什么计算，不加任何映射转换
+    """
+    # 去除空格、括号等符号，只保留汉字
+    clean_home = re.sub(r'[^\u4e00-\u9fa5]', '', home)
+    clean_away = re.sub(r'[^\u4e00-\u9fa5]', '', away)
+    
+    home_strokes = count_strokes(clean_home)
+    away_strokes = count_strokes(clean_away)
+    total_strokes = home_strokes + away_strokes
+    
+    # 梅花易数起卦法
+    upper_num = home_strokes % 8
+    if upper_num == 0:
+        upper_num = 8
+    lower_num = away_strokes % 8
+    if lower_num == 0:
+        lower_num = 8
+    moving_yao = total_strokes % 6
+    if moving_yao == 0:
+        moving_yao = 6
+    
+    num_to_gua = {
+        1: "乾", 2: "兑", 3: "离", 4: "震",
+        5: "巽", 6: "坎", 7: "艮", 8: "坤"
     }
-    upper, lower = base_pool.get(match_type, ("乾", "乾"))
+    
+    upper = num_to_gua.get(upper_num, "乾")
+    lower = num_to_gua.get(lower_num, "乾")
+    
     reverse = {"乾":"坤","坤":"乾","震":"巽","巽":"震","坎":"离","离":"坎","艮":"兑","兑":"艮"}
     change_upper = reverse.get(upper, upper)
     change_lower = reverse.get(lower, lower)
-    inter_upper = "坎" if match_type != "draw" else "坤"
-    inter_lower = "离" if match_type != "draw" else "坤"
-
+    
+    inter_upper = "坎" if upper != "坤" else "坤"
+    inter_lower = "离" if lower != "坤" else "坤"
+    
     body = upper
     use = lower
     body_wuxing = get_wuxing(body)
     use_wuxing = get_wuxing(use)
+    
     if body_wuxing == use_wuxing:
         ti_yong = "比和（平局相）"
     elif (body_wuxing == "木" and use_wuxing == "土") or \
@@ -269,8 +335,10 @@ def generate_gua_info(match_type, home, away):
         ti_yong = "用克体（客队制胜）"
     else:
         ti_yong = "相生（平和）"
-    shi_yao = 0
-    ying_yao = 4
+    
+    shi_yao = moving_yao - 1
+    ying_yao = (shi_yao + 4) % 6
+    
     return {
         "base": (upper, lower),
         "base_key": upper + lower,
@@ -285,8 +353,14 @@ def generate_gua_info(match_type, home, away):
         "use_wuxing": use_wuxing,
         "ti_yong": ti_yong,
         "shi_yao": shi_yao,
-        "ying_yao": ying_yao
+        "ying_yao": ying_yao,
+        "moving_yao": moving_yao,
+        "home_strokes": home_strokes,
+        "away_strokes": away_strokes,
+        "total_strokes": total_strokes
     }
+
+# ================== 第一阶段函数 ==================
 
 def analyze_yao(gua_info, match_type, home, away):
     """详细六爻分析，融合足球场景"""
@@ -377,7 +451,6 @@ def full_gua_analysis(match_type, home, away):
 # ================== 第三阶段：量化计算 ==================
 
 def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches):
-    """计算λ，并应用补丁①、⑤"""
     elo_factor = (home_elo - away_elo) / 2000 * 0.4
     xg_factor = (home_xg / (home_xg + away_xg + 0.01)) * 0.4
     form_factor = (home_form - away_form) * 0.1 + 0.5
@@ -556,7 +629,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 补丁融合 + 自定义让球")
+st.title("⚽ V6.0 足球预测 · 笔画起卦版")
 st.caption("卦象定方向 · 补丁调参数 · 量化定概率 · 四层推演出结论")
 
 # ---------- 输入区 ----------
@@ -575,7 +648,7 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
         away_xg = st.number_input("xG", value=1.2, step=0.1, key="away_xg")
         away_form = st.number_input("近5场胜率", value=0.5, step=0.05, key="away_form")
 
-    # 比赛日期和时间（分开输入，组合成 datetime）
+    # 比赛日期和时间
     match_date = st.date_input("比赛日期", value=datetime.date.today())
     match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
     match_time = datetime.datetime.combine(match_date, match_time_sel)
@@ -625,14 +698,17 @@ if st.button("🔮 开始推演", use_container_width=True):
             "odds_up": odds_up,
         }
 
-        # ========== 第一阶段：卦象分析 ==========
+        # ========== 第一阶段：卦象分析（笔画起卦） ==========
         st.divider()
-        st.markdown("## 🔮 第一阶段：卦象分析")
+        st.markdown("## 🔮 第一阶段：卦象分析（笔画起卦）")
         
         gua_analysis = full_gua_analysis(mt_key, home, away)
         gua_info = gua_analysis["gua_info"]
         yao_details = gua_analysis["yao_details"]
         bing_yao = gua_analysis["bing_yao"]
+
+        # 显示起卦依据
+        st.caption(f"起卦依据：主队“{home}”笔画数 {gua_info['home_strokes']}，客队“{away}”笔画数 {gua_info['away_strokes']}，总笔画 {gua_info['total_strokes']}，动爻 {gua_info['moving_yao']}")
 
         col_g1, col_g2, col_g3 = st.columns(3)
         col_g1.metric("本卦", f"{gua_info['base'][0]}{gua_info['base'][1]}（{gua_info['base_name']}）")
@@ -756,4 +832,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 补丁融合+自定义让球+比赛时间版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 笔画起卦版")
