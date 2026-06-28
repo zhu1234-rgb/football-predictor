@@ -1,5 +1,5 @@
-# V6.0 足球预测 · 最终完整版
-# 笔画起卦 · 精确让球匹配 · 补丁融合 · 比赛时间
+# V6.0 足球预测 · 精确让球匹配版
+# 笔画起卦 · 补丁融合 · 比赛时间 · 四层推演
 
 import streamlit as st
 import math
@@ -512,47 +512,80 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     if xg_sum >= 6.5:
         goal_primary = "5"; goal_secondary = "7+"
 
-    # ----- 第四步：生成比分首推和次推 -----
-    def generate_score(dir, goals, is_primary=True):
+    # ----- 第四步：生成比分首推和次推（严格匹配让球结果） -----
+    def generate_score(dir, goals, hc_num, is_primary=True):
+        # 根据方向和让球数生成符合净胜要求的比分
+        # 主队让球为正，主队受让为负
         if dir == "主胜":
-            if goals == "1": return "1:0"
-            elif goals == "2": return "2:0"
-            elif goals == "3": return "3:0"
-            elif goals == "4": return "3:1"
-            elif goals == "5": return "4:1"
-            else: return "2:0"
+            if hc_num >= 0:  # 主队让球
+                if hc_num == 1:
+                    # 让球结果取决于净胜：净胜≥2为让胜，净胜=1为让平，净胜<1为让负（不可能主胜且让负）
+                    # 我们尽量选择让胜或让平，根据预测的总进球
+                    if goals >= 2:
+                        return "2:0" if goals == 2 else "3:0" if goals == 3 else "3:1"  # 让胜
+                    else:
+                        return "1:0"  # 让平
+                elif hc_num == 2:
+                    # 让2球，需净胜≥3让胜，净胜=2让平
+                    if goals >= 3:
+                        return "3:0" if goals == 3 else "4:0" if goals == 4 else "4:1"
+                    else:
+                        return "2:0" if goals == 2 else "1:0"  # 让平（净胜2）
+                else:  # 其他让球数，简化处理
+                    return "2:0" if goals >= 2 else "1:0"
+            else:  # 主队受让（客队让球）
+                # 主胜时，受让必然让胜，比分可以是任何主胜，根据进球
+                if goals >= 2:
+                    return "2:1" if goals == 2 else "3:1" if goals == 3 else "3:2"
+                else:
+                    return "1:0"
         elif dir == "平局":
-            if goals == "0": return "0:0"
-            elif goals == "1": return "1:1"
-            elif goals == "2": return "1:1" if is_primary else "2:2"
-            else: return "1:1"
+            # 平局时，无论主队让或受让，让球结果都是让负（主队减球后必输）
+            return "1:1" if goals >= 2 else "0:0" if goals == 0 else "1:1"  # 优先1:1
         else:  # 客胜
-            if goals == "1": return "0:1"
-            elif goals == "2": return "0:2"
-            elif goals == "3": return "1:2"
-            else: return "0:1"
+            if hc_num >= 0:  # 主队让球
+                # 客胜时，让球结果取决于净胜：客胜1球则让负，客胜2球以上也让负，客胜1球且让球后平？实际让1球时客胜1球=>让负，客胜2球=>让负，客胜0?不可能
+                # 用户要求让负时净胜≥2，所以若让负，我们选择净胜≥2
+                # 先确定让球结果：如果我们选客胜1球，则让负，但总进球为1，与用户期望不符，所以强制净胜≥2
+                if goals >= 2:
+                    return "0:2" if goals == 2 else "0:3" if goals == 3 else "1:3"
+                else:
+                    # 如果总进球预测为1，但我们想让负且净胜≥2，则调整总进球为2
+                    return "0:2"  # 强制2球
+            else:  # 主队受让
+                # 客胜时，若客胜1球，主队加1后可能平（让平），若客胜2球，则让负
+                # 根据总进球选择
+                if goals >= 2:
+                    return "0:2" if goals == 2 else "0:3" if goals == 3 else "1:3"  # 让负（净胜≥2）
+                else:
+                    return "0:1"  # 客胜1球，让平
 
-    score_primary = generate_score(dir_primary, goal_primary, True)
-    score_secondary = generate_score(dir_primary, goal_secondary, False)
-    # 调整次推比分与方向次推一致
-    def adjust_score(dir, score):
+    score_primary = generate_score(dir_primary, goal_primary, handicap_num, True)
+    # 次推：用次推方向+次推总进球
+    # 但次推方向可能与首推不同，我们先用首推方向+次推总进球，再调整
+    score_secondary = generate_score(dir_primary, goal_secondary, handicap_num, False)
+    # 如果次推比分与方向次推不符，则根据方向次推调整
+    def adjust_score_by_dir(score, dir, hc_num):
         h, a = map(int, score.split(':'))
-        if dir == "主胜" and h <= a:
-            return "1:0" if h == a else "2:0" if a == 0 else "2:1"
-        elif dir == "客胜" and h >= a:
-            return "0:1" if h == a else "0:2"
-        elif dir == "平局" and h != a:
-            return "1:1"
+        if dir == "主胜":
+            if h <= a:
+                return "1:0" if a == 0 else "2:1"
+        elif dir == "客胜":
+            if h >= a:
+                return "0:1" if a == 1 else "0:2"
+        elif dir == "平局":
+            if h != a:
+                return "1:1"
         return score
-    score_secondary = adjust_score(dir_secondary, score_secondary)
+    score_secondary = adjust_score_by_dir(score_secondary, dir_secondary, handicap_num)
 
-    # ----- 根据比分计算让球结果（核心规则） -----
+    # ----- 根据比分计算让球结果 -----
     def calc_handicap(score, handicap):
         h, a = map(int, score.split(':'))
-        if handicap >= 0:  # 主队让球
+        if handicap >= 0:
             virtual_h = h - handicap
             virtual_a = a
-        else:  # 主队受让
+        else:
             virtual_h = h + (-handicap)
             virtual_a = a
         if virtual_h > virtual_a:
@@ -565,13 +598,23 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     handicap_primary = calc_handicap(score_primary, handicap_num)
     handicap_secondary = calc_handicap(score_secondary, handicap_num)
 
+    # 重新调整总进球与比分一致
+    # 由于强制调整了比分，总进球可能变化，我们更新总进球
+    def update_goals(score):
+        return str(sum(map(int, score.split(':'))))
+
+    # 但首推总进球保持原值，因为比分已根据原总进球生成，但有可能被强制改变（如客胜让负时），所以修正
+    # 我们简单让总进球等于实际比分总和
+    g_prim = str(sum(map(int, score_primary.split(':'))))
+    g_sec = str(sum(map(int, score_secondary.split(':'))))
+
     return {
         "direction_primary": dir_primary,
         "direction_secondary": dir_secondary,
         "handicap_primary": handicap_primary,
         "handicap_secondary": handicap_secondary,
-        "goal_primary": goal_primary,
-        "goal_secondary": goal_secondary,
+        "goal_primary": g_prim,
+        "goal_secondary": g_sec,
         "score_primary": score_primary,
         "score_secondary": score_secondary,
         "lam_h": home_xg,
@@ -594,8 +637,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 完整版")
-st.caption("卦象由队伍笔画决定 · 比赛性质影响状态参数 · 让球精确匹配")
+st.title("⚽ V6.0 足球预测 · 最终版")
+st.caption("卦象由队伍笔画决定 · 比赛性质影响状态 · 让球/比分/总进球严格统一")
 
 # ---------- 输入区 ----------
 with st.expander("📋 球队与赔率基础数据", expanded=True):
@@ -806,4 +849,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 最终完整版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 最终版")
