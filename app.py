@@ -1,5 +1,5 @@
 # V6.0 足球预测 · 32强数据完整版
-# 内置全部32支球队的Elo和xG数据
+# 输入球队名称后自动填充数据，无需手动修改
 
 import streamlit as st
 import math
@@ -653,7 +653,7 @@ st.markdown("""
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
 st.title("⚽ V6.0 足球预测 · 32强数据版")
-st.caption("内置全部32支球队的Elo和xG数据，输入队名自动填充")
+st.caption("输入球队名称自动填充数据，无需手动修改")
 
 # ---------- 输入区 ----------
 with st.expander("📋 球队与赔率基础数据", expanded=True):
@@ -661,33 +661,36 @@ with st.expander("📋 球队与赔率基础数据", expanded=True):
     with col1:
         st.subheader("主队")
         home = st.text_input("球队名称", placeholder="如：巴西", key="home")
+        # 自动填充数据
         if home in TEAM_DATA:
-            st.success(f"预设数据：ELO={TEAM_DATA[home]['elo']}，xG={TEAM_DATA[home]['xg']}，胜率={TEAM_DATA[home]['form']}")
-            default_elo_h = TEAM_DATA[home]['elo']
-            default_xg_h = TEAM_DATA[home]['xg']
-            default_form_h = TEAM_DATA[home]['form']
+            home_elo_val = TEAM_DATA[home]["elo"]
+            home_xg_val = TEAM_DATA[home]["xg"]
+            home_form_val = TEAM_DATA[home]["form"]
+            st.success(f"✅ 预设数据：ELO={home_elo_val}，xG={home_xg_val}，胜率={home_form_val}")
         else:
-            default_elo_h = 2000
-            default_xg_h = 1.5
-            default_form_h = 0.6
-        home_elo = st.number_input("ELO", value=default_elo_h, step=10, key="home_elo")
-        home_xg = st.number_input("xG（场均）", value=default_xg_h, step=0.1, key="home_xg", min_value=0.0, max_value=4.0)
-        home_form = st.number_input("近5场胜率（0-1）", value=default_form_h, step=0.05, key="home_form", min_value=0.0, max_value=1.0)
+            home_elo_val = 2000
+            home_xg_val = 1.5
+            home_form_val = 0.6
+            st.info("💡 未识别球队，请手动输入数据")
+        home_elo = st.number_input("ELO", value=home_elo_val, step=10, key="home_elo")
+        home_xg = st.number_input("xG（场均）", value=home_xg_val, step=0.1, key="home_xg", min_value=0.0, max_value=4.0)
+        home_form = st.number_input("近5场胜率（0-1）", value=home_form_val, step=0.05, key="home_form", min_value=0.0, max_value=1.0)
     with col2:
         st.subheader("客队")
         away = st.text_input("球队名称", placeholder="如：日本", key="away")
         if away in TEAM_DATA:
-            st.success(f"预设数据：ELO={TEAM_DATA[away]['elo']}，xG={TEAM_DATA[away]['xg']}，胜率={TEAM_DATA[away]['form']}")
-            default_elo_a = TEAM_DATA[away]['elo']
-            default_xg_a = TEAM_DATA[away]['xg']
-            default_form_a = TEAM_DATA[away]['form']
+            away_elo_val = TEAM_DATA[away]["elo"]
+            away_xg_val = TEAM_DATA[away]["xg"]
+            away_form_val = TEAM_DATA[away]["form"]
+            st.success(f"✅ 预设数据：ELO={away_elo_val}，xG={away_xg_val}，胜率={away_form_val}")
         else:
-            default_elo_a = 1900
-            default_xg_a = 1.2
-            default_form_a = 0.5
-        away_elo = st.number_input("ELO", value=default_elo_a, step=10, key="away_elo")
-        away_xg = st.number_input("xG（场均）", value=default_xg_a, step=0.1, key="away_xg", min_value=0.0, max_value=4.0)
-        away_form = st.number_input("近5场胜率（0-1）", value=default_form_a, step=0.05, key="away_form", min_value=0.0, max_value=1.0)
+            away_elo_val = 1900
+            away_xg_val = 1.2
+            away_form_val = 0.5
+            st.info("💡 未识别球队，请手动输入数据")
+        away_elo = st.number_input("ELO", value=away_elo_val, step=10, key="away_elo")
+        away_xg = st.number_input("xG（场均）", value=away_xg_val, step=0.1, key="away_xg", min_value=0.0, max_value=4.0)
+        away_form = st.number_input("近5场胜率（0-1）", value=away_form_val, step=0.05, key="away_form", min_value=0.0, max_value=1.0)
 
     match_date = st.date_input("比赛日期", value=datetime.date.today())
     match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
