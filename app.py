@@ -164,4 +164,6 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.markdown(f"<div style='font-size:48px; text-align:center;'>{result['best_score']}</div>", unsafe_allow_html=True)
         st.caption(f"模型置信度：{result['best_prob']:.2%}")
         st.subheader("📊 比分概率分布（前5）")
-        sorted_scores = sorted(result.items()? 不对，这里需要修复)
+        sorted_scores = sorted(score_probs.items(), key=lambda x: x[1], reverse=True)[:5]
+        for (h, a), prob in sorted_scores:
+            st.progress(prob, text=f"{h}-{a} : {prob:.2%}")
