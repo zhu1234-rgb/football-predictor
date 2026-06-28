@@ -1,4 +1,5 @@
-# V6.0 足球预测
+# V6.0 足球预测 · 补丁融合 + 自定义让球 + 比赛时间版
+# 移除基础知识库，保留并丰富六爻逐爻详解，杂占依据比赛时间
 
 import streamlit as st
 import math
@@ -771,4 +772,4 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("V6.0 足球预测。")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 补丁融合+自定义让球+比赛时间版")
