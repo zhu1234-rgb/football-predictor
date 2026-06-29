@@ -695,7 +695,7 @@ st.markdown("""<style>
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
 st.title("⚽ V6.0 足球预测 · 2026 xG版")
-st.caption("内置32强最新xG数据 + 2018/2022机器学习 + 易经占卜 + 杂占 + 回测 + 泊松分布 + 凯利公式")
+st.caption("内置32强最新xG数据 + 机器学习 + 易经占卜 + 杂占 + 回测 + 共振分析")
 
 with st.spinner("正在训练机器学习模型..."):
     clf, reg, scaler, fcols = train_models()
@@ -713,22 +713,9 @@ with st.expander("📋 输入比赛信息", expanded=True):
     match_date = st.date_input("比赛日期", datetime.date.today())
     match_time = st.time_input("比赛时间", datetime.time(0, 0))
     match_dt = datetime.datetime.combine(match_date, match_time)
-    st.subheader("赔率数据")
-    co = st.columns(3)
-    with co[0]:
-        st.caption("胜平负")
-        odds_h = st.number_input("主胜", value=2.0, step=0.1, min_value=1.0)
-        odds_d = st.number_input("平局", value=3.2, step=0.1, min_value=1.0)
-        odds_a = st.number_input("客胜", value=3.5, step=0.1, min_value=1.0)
-    with co[1]:
-        st.caption("让球")
-        hc = st.selectbox("让球数", [-3, -2, -1, 0, 1, 2, 3],
-                          format_func=lambda x: f"主队{'+' if x < 0 else '-'}{abs(x)}" if x else "平手", index=2)
-        odds_hc_h = st.number_input("让胜", value=3.5, step=0.1, min_value=1.0)
-        odds_hc_d = st.number_input("让平", value=3.4, step=0.1, min_value=1.0)
-        odds_hc_a = st.number_input("让负", value=2.0, step=0.1, min_value=1.0)
-    with co[2]:
-        st.caption("总进球/比分（已内嵌）")
+    st.subheader("让球设置")
+    hc = st.selectbox("让球数（主队±）", [-3, -2, -1, 0, 1, 2, 3],
+                      format_func=lambda x: f"主队{'+' if x < 0 else '-'}{abs(x)}" if x else "平手", index=2)
 
 with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
     cp1, cp2 = st.columns(2)
@@ -829,8 +816,8 @@ if st.button("🔮 开始推演", use_container_width=True):
                     ap += p
         st.write(f"**λ主**：{lh:.2f}，**λ客**：{la:.2f}")
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
-        if odds_h > 0 and odds_d > 0 and odds_a > 0:
-            st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")
+
+        # 泊松分布明细（保留）
         st.markdown("### 📈 泊松分布明细")
         score_probs = {}
         for h in range(5):
@@ -859,26 +846,34 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write("**总进球数概率分布**：")
         for g, p in sorted(goal_probs_agg.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
             st.write(f"  - {g} 球：{p:.1%}")
-        st.markdown("### 💰 凯利公式投注建议")
-        st.caption("凯利值 = (赔率 × 概率 - 1) / (赔率 - 1)，正值表示有投注价值，越大越值得。")
-        if odds_h > 0 and odds_d > 0 and odds_a > 0:
-            kelly_h = (odds_h * hp - 1) / (odds_h - 1) if odds_h > 1 else 0
-            kelly_d = (odds_d * dp - 1) / (odds_d - 1) if odds_d > 1 else 0
-            kelly_a = (odds_a * ap - 1) / (odds_a - 1) if odds_a > 1 else 0
-            st.write(f"**主胜**：凯利值 = {kelly_h:.3f}（{'✅ 有投注价值' if kelly_h > 0 else '❌ 不建议'}）")
-            st.write(f"**平局**：凯利值 = {kelly_d:.3f}（{'✅ 有投注价值' if kelly_d > 0 else '❌ 不建议'}）")
-            st.write(f"**客胜**：凯利值 = {kelly_a:.3f}（{'✅ 有投注价值' if kelly_a > 0 else '❌ 不建议'}）")
-            max_kelly = max(kelly_h, kelly_d, kelly_a)
-            if max_kelly > 0:
-                best_bet = ["主胜", "平局", "客胜"][[kelly_h, kelly_d, kelly_a].index(max_kelly)]
-                st.success(f"🏆 最佳投注选项：**{best_bet}**（凯利值 {max_kelly:.3f}）")
-            else:
-                st.warning("⚠️ 所有选项的凯利值均为负或零，建议观望或跳过。")
+
+        # 先进行四层推演（得到量化方向）
+        res = four_step_predict(home, away, mtk, he, ae, hx, ax, hf, af, hc, patches)
+
+        # ---------- 卦象与量化共振分析（新增） ----------
+        st.divider()
+        st.markdown("## 🔄 卦象与量化共振分析")
+        quant_direction = res['direction_primary']
+        ti_yong = gi['ti_yong']
+        if "体克用" in ti_yong:
+            gua_direction = "主胜"
+        elif "用克体" in ti_yong:
+            gua_direction = "客胜"
+        elif "比和" in ti_yong or "相生" in ti_yong:
+            gua_direction = "平局"
         else:
-            st.info("请先输入有效的胜平负赔率，凯利公式才能计算。")
+            gua_direction = "不明"
+        st.write(f"**量化模型预测方向**：{quant_direction}")
+        st.write(f"**卦象体用生克方向**：{gua_direction}（{ti_yong}）")
+        if quant_direction == gua_direction:
+            st.success(f"✅ 卦象与量化模型 **共振**，一致指向 **{quant_direction}**，建议坚定持有。")
+        else:
+            st.warning(f"⚠️ 卦象（{gua_direction}）与量化模型（{quant_direction}）出现分歧，建议谨慎对待，可观望或侧重防守。")
+            st.caption("心法：爻象定真，共振取象，三象合一。分歧时以量化模型为主，卦象作为风险提示。")
+
+        # 四层推演结论（显示）
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
-        res = four_step_predict(home, away, mtk, he, ae, hx, ax, hf, af, hc, patches)
         hd = f"主队-{hc}（主队让{hc}球）" if hc > 0 else f"主队+{-hc}（主队受让{-hc}球）" if hc < 0 else "平手"
         st.markdown(f"""
         <div class="four-step">
@@ -910,7 +905,7 @@ if st.button("🔮 开始推演", use_container_width=True):
         })
         st.toast("✅ 预测已保存至历史记录！", icon="💾")
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 + 泊松分布 + 凯利公式")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 + 共振分析")
 
 st.divider()
 st.markdown("## 📊 回测历史数据（2018+2022）")
