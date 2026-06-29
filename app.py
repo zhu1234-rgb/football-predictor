@@ -19,39 +19,39 @@ if 'predict_history' not in st.session_state:
 @st.cache_data
 def load_team_data():
     return {
-        "阿根廷": {"elo": 2148, "xg": 1.43, "form": 0.67, "group_goals": 7, "group_rank": 1},
-        "巴西": {"elo": 2099, "xg": 1.64, "form": 0.67, "group_goals": 6, "group_rank": 1},
-        "哥伦比亚": {"elo": 2004, "xg": 2.00, "form": 0.67, "group_goals": 5, "group_rank": 1},
-        "厄瓜多尔": {"elo": 1902, "xg": 1.97, "form": 0.67, "group_goals": 6, "group_rank": 2},
-        "巴拉圭": {"elo": 1815, "xg": 0.87, "form": 0.33, "group_goals": 2, "group_rank": 2},
-        "乌拉圭": {"elo": 1841, "xg": 1.96, "form": 0.33, "group_goals": 3, "group_rank": 2},
-        "西班牙": {"elo": 2144, "xg": 2.28, "form": 0.67, "group_goals": 8, "group_rank": 1},
-        "法国": {"elo": 2123, "xg": 2.06, "form": 0.67, "group_goals": 10, "group_rank": 1},
-        "英格兰": {"elo": 2038, "xg": 2.10, "form": 0.67, "group_goals": 8, "group_rank": 1},
-        "葡萄牙": {"elo": 1990, "xg": 1.53, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "荷兰": {"elo": 1980, "xg": 1.89, "form": 0.67, "group_goals": 10, "group_rank": 1},
-        "挪威": {"elo": 1918, "xg": 1.47, "form": 0.67, "group_goals": 8, "group_rank": 1},
-        "德国": {"elo": 1916, "xg": 2.19, "form": 0.67, "group_goals": 10, "group_rank": 1},
-        "瑞士": {"elo": 1914, "xg": 1.92, "form": 0.67, "group_goals": 7, "group_rank": 1},
-        "克罗地亚": {"elo": 1905, "xg": 1.14, "form": 0.33, "group_goals": 3, "group_rank": 2},
-        "比利时": {"elo": 1884, "xg": 2.33, "form": 0.67, "group_goals": 8, "group_rank": 1},
-        "奥地利": {"elo": 1836, "xg": 1.25, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "瑞典": {"elo": 1742, "xg": 1.74, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "波黑": {"elo": 1622, "xg": 1.17, "form": 0.33, "group_goals": 2, "group_rank": 3},
-        "摩洛哥": {"elo": 1877, "xg": 1.78, "form": 0.67, "group_goals": 5, "group_rank": 1},
-        "塞内加尔": {"elo": 1842, "xg": 1.93, "form": 0.67, "group_goals": 6, "group_rank": 1},
-        "科特迪瓦": {"elo": 1743, "xg": 1.38, "form": 0.33, "group_goals": 3, "group_rank": 2},
-        "阿尔及利亚": {"elo": 1785, "xg": 1.54, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "埃及": {"elo": 1742, "xg": 1.50, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "加纳": {"elo": 1575, "xg": 0.68, "form": 0.33, "group_goals": 2, "group_rank": 3},
-        "南非": {"elo": 1575, "xg": 1.13, "form": 0.33, "group_goals": 2, "group_rank": 2},
-        "民主刚果": {"elo": 1712, "xg": 1.27, "form": 0.33, "group_goals": 1, "group_rank": 3},
-        "佛得角": {"elo": 1622, "xg": 1.07, "form": 0.33, "group_goals": 1, "group_rank": 3},
-        "日本": {"elo": 1910, "xg": 1.27, "form": 0.67, "group_goals": 4, "group_rank": 2},
-        "澳大利亚": {"elo": 1800, "xg": 1.17, "form": 0.33, "group_goals": 2, "group_rank": 2},
-        "墨西哥": {"elo": 1912, "xg": 1.36, "form": 0.33, "group_goals": 4, "group_rank": 2},
-        "美国": {"elo": 1781, "xg": 1.78, "form": 0.67, "group_goals": 6, "group_rank": 1},
-        "加拿大": {"elo": 1748, "xg": 2.35, "form": 0.67, "group_goals": 9, "group_rank": 1},
+        "阿根廷": {"elo": 2148, "xg": 1.43, "group_goals": 7, "group_rank": 1},
+        "巴西": {"elo": 2099, "xg": 1.64, "group_goals": 6, "group_rank": 1},
+        "哥伦比亚": {"elo": 2004, "xg": 2.00, "group_goals": 5, "group_rank": 1},
+        "厄瓜多尔": {"elo": 1902, "xg": 1.97, "group_goals": 6, "group_rank": 2},
+        "巴拉圭": {"elo": 1815, "xg": 0.87, "group_goals": 2, "group_rank": 2},
+        "乌拉圭": {"elo": 1841, "xg": 1.96, "group_goals": 3, "group_rank": 2},
+        "西班牙": {"elo": 2144, "xg": 2.28, "group_goals": 8, "group_rank": 1},
+        "法国": {"elo": 2123, "xg": 2.06, "group_goals": 10, "group_rank": 1},
+        "英格兰": {"elo": 2038, "xg": 2.10, "group_goals": 8, "group_rank": 1},
+        "葡萄牙": {"elo": 1990, "xg": 1.53, "group_goals": 4, "group_rank": 2},
+        "荷兰": {"elo": 1980, "xg": 1.89, "group_goals": 10, "group_rank": 1},
+        "挪威": {"elo": 1918, "xg": 1.47, "group_goals": 8, "group_rank": 1},
+        "德国": {"elo": 1916, "xg": 2.19, "group_goals": 10, "group_rank": 1},
+        "瑞士": {"elo": 1914, "xg": 1.92, "group_goals": 7, "group_rank": 1},
+        "克罗地亚": {"elo": 1905, "xg": 1.14, "group_goals": 3, "group_rank": 2},
+        "比利时": {"elo": 1884, "xg": 2.33, "group_goals": 8, "group_rank": 1},
+        "奥地利": {"elo": 1836, "xg": 1.25, "group_goals": 4, "group_rank": 2},
+        "瑞典": {"elo": 1742, "xg": 1.74, "group_goals": 4, "group_rank": 2},
+        "波黑": {"elo": 1622, "xg": 1.17, "group_goals": 2, "group_rank": 3},
+        "摩洛哥": {"elo": 1877, "xg": 1.78, "group_goals": 5, "group_rank": 1},
+        "塞内加尔": {"elo": 1842, "xg": 1.93, "group_goals": 6, "group_rank": 1},
+        "科特迪瓦": {"elo": 1743, "xg": 1.38, "group_goals": 3, "group_rank": 2},
+        "阿尔及利亚": {"elo": 1785, "xg": 1.54, "group_goals": 4, "group_rank": 2},
+        "埃及": {"elo": 1742, "xg": 1.50, "group_goals": 4, "group_rank": 2},
+        "加纳": {"elo": 1575, "xg": 0.68, "group_goals": 2, "group_rank": 3},
+        "南非": {"elo": 1575, "xg": 1.13, "group_goals": 2, "group_rank": 2},
+        "民主刚果": {"elo": 1712, "xg": 1.27, "group_goals": 1, "group_rank": 3},
+        "佛得角": {"elo": 1622, "xg": 1.07, "group_goals": 1, "group_rank": 3},
+        "日本": {"elo": 1910, "xg": 1.27, "group_goals": 4, "group_rank": 2},
+        "澳大利亚": {"elo": 1800, "xg": 1.17, "group_goals": 2, "group_rank": 2},
+        "墨西哥": {"elo": 1912, "xg": 1.36, "group_goals": 4, "group_rank": 2},
+        "美国": {"elo": 1781, "xg": 1.78, "group_goals": 6, "group_rank": 1},
+        "加拿大": {"elo": 1748, "xg": 2.35, "group_goals": 9, "group_rank": 1},
     }
 TEAM_DATA = load_team_data()
 
@@ -329,12 +329,11 @@ def get_shichen_from_time(match_time):
     hour = match_time.hour
     return SHICHEN[(hour + 1) // 2 % 12]
 
-def compute_lam(he, ae, hx, ax, hf, af, patches, mt):
+def compute_lam(he, ae, hx, ax, patches, mt):
     ef = (he - ae) / 2000 * 0.4
     xf = (hx / (hx + ax + 0.01)) * 0.4
-    ff = (hf - af) * 0.1 + 0.5
-    lh = max(0.3, ef + xf + ff)
-    la = max(0.3, -ef + (ax / (hx + ax + 0.01)) * 0.4 + (af - hf) * 0.1 + 0.5)
+    lh = max(0.3, ef + xf + 0.5)
+    la = max(0.3, -ef + (ax / (hx + ax + 0.01)) * 0.4 + 0.5)
     if patches.get("home_rotation", 0) >= 4:
         lh *= 0.5
     if patches.get("away_rotation", 0) >= 4:
@@ -350,7 +349,7 @@ def compute_lam(he, ae, hx, ax, hf, af, patches, mt):
 def poisson_prob(l, g):
     return math.exp(-l) * (l ** g) / math.factorial(g)
 
-def generate_dynamic_score(dp, gi, hc, he, ae, hx, ax, hf, af):
+def generate_dynamic_score(dp, gi, he, ae, hx, ax):
     ed = he - ae
     xd = hx - ax
     if ed >= 200:
@@ -376,27 +375,18 @@ def generate_dynamic_score(dp, gi, hc, he, ae, hx, ax, hf, af):
     e = round(e)
     e = max(1, min(4, e))
     if dp == "主胜":
-        if hc >= 0:
-            if e >= 3:
-                if gi >= 3:
-                    return f"{e}:0" if e >= 3 else "3:0"
-                else:
-                    return "2:0"
-            elif e >= 2:
-                return "2:0"
-            else:
-                return "1:0"
-        else:
+        if e >= 3:
             if gi >= 3:
-                return "2:1"
+                return f"{e}:0" if e >= 3 else "3:0"
             else:
-                return "1:0"
+                return "2:0"
+        elif e >= 2:
+            return "2:0"
+        else:
+            return "1:0"
     elif dp == "客胜":
-        if hc <= 0:
-            if e >= 2:
-                return f"0:{e}" if e >= 2 else "0:2"
-            else:
-                return "0:1"
+        if e >= 2:
+            return f"0:{e}" if e >= 2 else "0:2"
         else:
             return "0:1"
     else:
@@ -405,7 +395,7 @@ def generate_dynamic_score(dp, gi, hc, he, ae, hx, ax, hf, af):
         else:
             return "0:0"
 
-def four_step_predict(home, away, mt, he, ae, hx, ax, hf, af, hc, patches):
+def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
     ed = he - ae
     xs = hx + ax
     if patches.get("draw_to_advance") == "home":
@@ -432,10 +422,10 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, hf, af, hc, patches):
             dp = "客胜"
             ds = "平局"
     elif abs(ed) >= 50:
-        if hx > ax and hf >= af:
+        if hx > ax:
             dp = "主胜"
             ds = "平局"
-        elif ax > hx and af >= hf:
+        elif ax > hx:
             dp = "客胜"
             ds = "平局"
         else:
@@ -469,8 +459,8 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, hf, af, hc, patches):
         gs = "7+"
     gpi = int(gp) if gp.isdigit() else 0
     gsi = int(gs) if gs.isdigit() else 0
-    sp = generate_dynamic_score(dp, gpi, hc, he, ae, hx, ax, hf, af)
-    ss = generate_dynamic_score(dp, gsi, hc, he, ae, hx, ax, hf, af)
+    sp = generate_dynamic_score(dp, gpi, he, ae, hx, ax)
+    ss = generate_dynamic_score(dp, gsi, he, ae, hx, ax)
 
     def adj(s, d):
         hh, aa = map(int, s.split(':'))
@@ -483,25 +473,7 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, hf, af, hc, patches):
         return s
 
     ss = adj(ss, ds)
-
-    def calc(s, hc):
-        hh, aa = map(int, s.split(':'))
-        if hc >= 0:
-            vh = hh - hc
-            va = aa
-        else:
-            vh = hh + (-hc)
-            va = aa
-        if vh > va:
-            return "让胜"
-        elif vh == va:
-            return "让平"
-        else:
-            return "让负"
-
-    hcp = calc(sp, hc)
-    hcs = calc(ss, hc)
-    return {"direction_primary": dp, "direction_secondary": ds, "handicap_primary": hcp, "handicap_secondary": hcs,
+    return {"direction_primary": dp, "direction_secondary": ds,
             "goal_primary": str(sum(map(int, sp.split(':')))), "goal_secondary": str(sum(map(int, ss.split(':')))),
             "score_primary": sp, "score_secondary": ss, "lam_h": hx, "lam_a": ax}
 
@@ -695,7 +667,7 @@ st.markdown("""<style>
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
 st.title("⚽ V6.0 足球预测 · 2026 xG版")
-st.caption("内置32强最新xG数据 + 机器学习 + 易经占卜 + 杂占 + 回测 + 共振分析")
+st.caption("基于 Elo + xG · 易经占卜 · 泊松分布 · 共振分析")
 
 with st.spinner("正在训练机器学习模型..."):
     clf, reg, scaler, fcols = train_models()
@@ -713,9 +685,6 @@ with st.expander("📋 输入比赛信息", expanded=True):
     match_date = st.date_input("比赛日期", datetime.date.today())
     match_time = st.time_input("比赛时间", datetime.time(0, 0))
     match_dt = datetime.datetime.combine(match_date, match_time)
-    st.subheader("让球设置")
-    hc = st.selectbox("让球数（主队±）", [-3, -2, -1, 0, 1, 2, 3],
-                      format_func=lambda x: f"主队{'+' if x < 0 else '-'}{abs(x)}" if x else "平手", index=2)
 
 with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
     cp1, cp2 = st.columns(2)
@@ -736,12 +705,10 @@ if st.button("🔮 开始推演", use_container_width=True):
     else:
         he = TEAM_DATA[home]["elo"]
         hx = TEAM_DATA[home]["xg"]
-        hf = TEAM_DATA[home]["form"]
         ae = TEAM_DATA[away]["elo"]
         ax = TEAM_DATA[away]["xg"]
-        af = TEAM_DATA[away]["form"]
-        st.success(f"✅ 主队 {home}: ELO={he}, xG={hx}, 胜率={hf}")
-        st.success(f"✅ 客队 {away}: ELO={ae}, xG={ax}, 胜率={af}")
+        st.success(f"✅ 主队 {home}: ELO={he}, xG={hx}")
+        st.success(f"✅ 客队 {away}: ELO={ae}, xG={ax}")
         mt_map = {"常规": "general", "淘汰赛": "knockout", "决赛": "final",
                   "保级/出线生死战": "draw", "强弱悬殊": "slaughter"}
         mtk = mt_map[match_type]
@@ -803,7 +770,7 @@ if st.button("🔮 开始推演", use_container_width=True):
             st.markdown(f"**鹊噪**：{QUE_ZAO[sc]}")
         st.divider()
         st.markdown("## 📊 第三阶段：量化计算")
-        lh, la = compute_lam(he, ae, hx, ax, hf, af, patches, mtk)
+        lh, la = compute_lam(he, ae, hx, ax, patches, mtk)
         hp = dp = ap = 0
         for h in range(5):
             for a in range(5):
@@ -817,7 +784,6 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write(f"**λ主**：{lh:.2f}，**λ客**：{la:.2f}")
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
 
-        # 泊松分布明细（保留）
         st.markdown("### 📈 泊松分布明细")
         score_probs = {}
         for h in range(5):
@@ -847,10 +813,8 @@ if st.button("🔮 开始推演", use_container_width=True):
         for g, p in sorted(goal_probs_agg.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
             st.write(f"  - {g} 球：{p:.1%}")
 
-        # 先进行四层推演（得到量化方向）
-        res = four_step_predict(home, away, mtk, he, ae, hx, ax, hf, af, hc, patches)
+        res = four_step_predict(home, away, mtk, he, ae, hx, ax, patches)
 
-        # ---------- 卦象与量化共振分析（新增） ----------
         st.divider()
         st.markdown("## 🔄 卦象与量化共振分析")
         quant_direction = res['direction_primary']
@@ -871,16 +835,13 @@ if st.button("🔮 开始推演", use_container_width=True):
             st.warning(f"⚠️ 卦象（{gua_direction}）与量化模型（{quant_direction}）出现分歧，建议谨慎对待，可观望或侧重防守。")
             st.caption("心法：爻象定真，共振取象，三象合一。分歧时以量化模型为主，卦象作为风险提示。")
 
-        # 四层推演结论（显示）
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
-        hd = f"主队-{hc}（主队让{hc}球）" if hc > 0 else f"主队+{-hc}（主队受让{-hc}球）" if hc < 0 else "平手"
         st.markdown(f"""
         <div class="four-step">
             <div class="step-card"><span class="step-number">① 胜平负</span><br><span class="step-primary">首推：{res['direction_primary']}</span><br><span class="step-secondary">次推：{res['direction_secondary']}</span></div>
-            <div class="step-card"><span class="step-number">② 让球胜平负（{hd}）</span><br><span class="step-primary">首推：{res['handicap_primary']}</span><br><span class="step-secondary">次推：{res['handicap_secondary']}</span></div>
-            <div class="step-card"><span class="step-number">③ 总进球数</span><br><span class="step-primary">首推：{res['goal_primary']}球</span><br><span class="step-secondary">次推：{res['goal_secondary']}球</span></div>
-            <div class="step-card"><span class="step-number">④ 比分（精准）</span><br><span class="step-primary">首推：{res['score_primary']}</span><br><span class="step-secondary">次推：{res['score_secondary']}</span></div>
+            <div class="step-card"><span class="step-number">② 总进球数</span><br><span class="step-primary">首推：{res['goal_primary']}球</span><br><span class="step-secondary">次推：{res['goal_secondary']}球</span></div>
+            <div class="step-card"><span class="step-number">③ 比分（精准）</span><br><span class="step-primary">首推：{res['score_primary']}</span><br><span class="step-secondary">次推：{res['score_secondary']}</span></div>
         </div>
         """, unsafe_allow_html=True)
         st.caption("补丁状态：" + (
@@ -905,7 +866,7 @@ if st.button("🔮 开始推演", use_container_width=True):
         })
         st.toast("✅ 预测已保存至历史记录！", icon="💾")
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 + 共振分析")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 · 无赔率无胜率")
 
 st.divider()
 st.markdown("## 📊 回测历史数据（2018+2022）")
