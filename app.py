@@ -828,8 +828,8 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write(f"**λ主**：{lh:.2f}，**λ客**：{la:.2f}")
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
         if odds_h > 0 and odds_d > 0 and odds_a > 0:
-            st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")
-            # ---------- 泊松分布详细分析（新增） ----------
+            st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")        
+# ---------- 泊松分布详细分析（新增） ----------
 st.markdown("### 📈 泊松分布明细")
 
 # 计算最常见比分及概率（0~4球）
