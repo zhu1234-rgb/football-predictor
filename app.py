@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import xgboost as xgb
 
-st.set_page_config(page_title="V6.0 足球预测 · 2026 xG版", page_icon="⚽", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="V6.0 足球预测 · 48队完整版", page_icon="⚽", layout="centered", initial_sidebar_state="collapsed")
 
 if 'predict_history' not in st.session_state:
     st.session_state.predict_history = []
@@ -19,39 +19,61 @@ if 'predict_history' not in st.session_state:
 @st.cache_data
 def load_team_data():
     return {
-        "阿根廷": {"elo": 2148, "xg": 1.43, "group_goals": 7, "group_rank": 1},
-        "巴西": {"elo": 2099, "xg": 1.64, "group_goals": 6, "group_rank": 1},
-        "哥伦比亚": {"elo": 2004, "xg": 2.00, "group_goals": 5, "group_rank": 1},
-        "厄瓜多尔": {"elo": 1902, "xg": 1.97, "group_goals": 6, "group_rank": 2},
-        "巴拉圭": {"elo": 1815, "xg": 0.87, "group_goals": 2, "group_rank": 2},
-        "乌拉圭": {"elo": 1841, "xg": 1.96, "group_goals": 3, "group_rank": 2},
-        "西班牙": {"elo": 2144, "xg": 2.28, "group_goals": 8, "group_rank": 1},
-        "法国": {"elo": 2123, "xg": 2.06, "group_goals": 10, "group_rank": 1},
-        "英格兰": {"elo": 2038, "xg": 2.10, "group_goals": 8, "group_rank": 1},
-        "葡萄牙": {"elo": 1990, "xg": 1.53, "group_goals": 4, "group_rank": 2},
-        "荷兰": {"elo": 1980, "xg": 1.89, "group_goals": 10, "group_rank": 1},
-        "挪威": {"elo": 1918, "xg": 1.47, "group_goals": 8, "group_rank": 1},
-        "德国": {"elo": 1916, "xg": 2.19, "group_goals": 10, "group_rank": 1},
-        "瑞士": {"elo": 1914, "xg": 1.92, "group_goals": 7, "group_rank": 1},
-        "克罗地亚": {"elo": 1905, "xg": 1.14, "group_goals": 3, "group_rank": 2},
-        "比利时": {"elo": 1884, "xg": 2.33, "group_goals": 8, "group_rank": 1},
-        "奥地利": {"elo": 1836, "xg": 1.25, "group_goals": 4, "group_rank": 2},
-        "瑞典": {"elo": 1742, "xg": 1.74, "group_goals": 4, "group_rank": 2},
-        "波黑": {"elo": 1622, "xg": 1.17, "group_goals": 2, "group_rank": 3},
-        "摩洛哥": {"elo": 1877, "xg": 1.78, "group_goals": 5, "group_rank": 1},
-        "塞内加尔": {"elo": 1842, "xg": 1.93, "group_goals": 6, "group_rank": 1},
-        "科特迪瓦": {"elo": 1743, "xg": 1.38, "group_goals": 3, "group_rank": 2},
-        "阿尔及利亚": {"elo": 1785, "xg": 1.54, "group_goals": 4, "group_rank": 2},
-        "埃及": {"elo": 1742, "xg": 1.50, "group_goals": 4, "group_rank": 2},
-        "加纳": {"elo": 1575, "xg": 0.68, "group_goals": 2, "group_rank": 3},
-        "南非": {"elo": 1575, "xg": 1.13, "group_goals": 2, "group_rank": 2},
-        "民主刚果": {"elo": 1712, "xg": 1.27, "group_goals": 1, "group_rank": 3},
-        "佛得角": {"elo": 1622, "xg": 1.07, "group_goals": 1, "group_rank": 3},
-        "日本": {"elo": 1910, "xg": 1.27, "group_goals": 4, "group_rank": 2},
-        "澳大利亚": {"elo": 1800, "xg": 1.17, "group_goals": 2, "group_rank": 2},
-        "墨西哥": {"elo": 1912, "xg": 1.36, "group_goals": 4, "group_rank": 2},
-        "美国": {"elo": 1781, "xg": 1.78, "group_goals": 6, "group_rank": 1},
-        "加拿大": {"elo": 1748, "xg": 2.35, "group_goals": 9, "group_rank": 1},
+        # ========== 南美区 ==========
+        "阿根廷": {"elo": 2148, "xg": 1.43},
+        "巴西": {"elo": 2099, "xg": 1.64},
+        "哥伦比亚": {"elo": 2004, "xg": 2.00},
+        "厄瓜多尔": {"elo": 1902, "xg": 1.97},
+        "巴拉圭": {"elo": 1815, "xg": 0.87},
+        "乌拉圭": {"elo": 1841, "xg": 1.96},
+        # ========== 欧洲区 ==========
+        "西班牙": {"elo": 2144, "xg": 2.28},
+        "法国": {"elo": 2123, "xg": 2.06},
+        "英格兰": {"elo": 2038, "xg": 2.10},
+        "葡萄牙": {"elo": 1990, "xg": 1.53},
+        "荷兰": {"elo": 1980, "xg": 1.89},
+        "挪威": {"elo": 1918, "xg": 1.47},
+        "德国": {"elo": 1916, "xg": 2.19},
+        "瑞士": {"elo": 1914, "xg": 1.92},
+        "克罗地亚": {"elo": 1905, "xg": 1.14},
+        "比利时": {"elo": 1884, "xg": 2.33},
+        "奥地利": {"elo": 1836, "xg": 1.25},
+        "瑞典": {"elo": 1742, "xg": 1.74},
+        "波黑": {"elo": 1622, "xg": 1.17},
+        "土耳其": {"elo": 1850, "xg": 2.61},
+        "捷克": {"elo": 1820, "xg": 1.30},
+        "苏格兰": {"elo": 1780, "xg": 1.11},
+        "荷属安德列斯": {"elo": 1650, "xg": 1.06},
+        "波斯尼亚-黑塞哥维那": {"elo": 1622, "xg": 1.17},
+        # ========== 非洲区 ==========
+        "摩洛哥": {"elo": 1877, "xg": 1.78},
+        "塞内加尔": {"elo": 1842, "xg": 1.93},
+        "科特迪瓦": {"elo": 1743, "xg": 1.38},
+        "阿尔及利亚": {"elo": 1785, "xg": 1.54},
+        "埃及": {"elo": 1742, "xg": 1.50},
+        "加纳": {"elo": 1575, "xg": 0.68},
+        "南非": {"elo": 1575, "xg": 1.13},
+        "民主刚果": {"elo": 1712, "xg": 1.27},
+        "佛得角": {"elo": 1622, "xg": 1.07},
+        "突尼斯": {"elo": 1680, "xg": 0.84},
+        # ========== 亚洲区 ==========
+        "日本": {"elo": 1910, "xg": 1.27},
+        "澳大利亚": {"elo": 1800, "xg": 1.17},
+        "韩国": {"elo": 1870, "xg": 1.48},
+        "伊朗": {"elo": 1825, "xg": 1.39},
+        "约旦": {"elo": 1700, "xg": 1.03},
+        "伊拉克": {"elo": 1650, "xg": 0.70},
+        "乌兹别克斯坦": {"elo": 1680, "xg": 0.87},
+        "沙特阿拉伯": {"elo": 1720, "xg": 0.82},
+        "卡塔尔": {"elo": 1700, "xg": 0.74},
+        # ========== 中北美及加勒比 ==========
+        "墨西哥": {"elo": 1912, "xg": 1.36},
+        "美国": {"elo": 1781, "xg": 1.78},
+        "加拿大": {"elo": 1748, "xg": 2.35},
+        "巴拿马": {"elo": 1680, "xg": 1.21},
+        "海地": {"elo": 1600, "xg": 1.14},
+        # ========== 大洋洲 ==========
+        "新西兰": {"elo": 1650, "xg": 1.43},
     }
 TEAM_DATA = load_team_data()
 
@@ -286,10 +308,10 @@ def analyze_yao(gua_info, match_type, home, away):
             txt = f"**五爻（气势）**：{home}的球队士气与教练临场调度。五爻为君位，主主教练与核心球员。此爻当权则全队气势如虹，受克则军心涣散。"
         else:
             txt = f"**上爻（终局）**：比赛最终走向与运气成分。上爻为天位，主结果与偶然因素。此爻临吉则好运相伴，临凶则恐有意外变数。"
-            if match_type in ["final", "knockout"]:
+            if match_type in ["final", "semi", "quarter", "round_16", "round_32"]:
                 txt += " 加时赛或点球大战的可能性需纳入考虑。"
         if lq == "官鬼":
-            if match_type == "knockout":
+            if match_type in ["round_16", "round_32", "quarter", "semi", "final"]:
                 txt += " 官鬼在淘汰赛主压力，宜有子孙解忧。"
             elif match_type == "final":
                 txt += " 官鬼在决赛主心理压力，谁先放下包袱谁占优。"
@@ -307,14 +329,14 @@ def analyze_yao(gua_info, match_type, home, away):
     return details
 
 def get_bing_yao(match_type):
-    if match_type == "knockout":
+    if match_type in ["round_16", "round_32", "quarter", "semi", "final"]:
         b = "淘汰赛官鬼为病，宜有子孙制之。"
     elif match_type == "final":
         b = "决赛双方皆谨慎，比和为主，病在谁先犯错。"
-    elif match_type == "draw":
-        b = "平局相，比和为主，病在攻守失衡。"
-    elif match_type == "slaughter":
-        b = "屠杀局，妻财过旺为病，宜有兄弟制财。"
+    elif match_type == "third":
+        b = "季军赛相对开放，比和为主，病在进攻欲望。"
+    elif match_type == "group":
+        b = "小组赛，比和为主，病在攻守失衡。"
     else:
         b = "卦中无动爻克用，病药不显。"
     return {"用神": "世爻（主队）", "忌神": "克用者", "元神": "生用者", "仇神": "克元神者", "病药": b}
@@ -339,7 +361,7 @@ def compute_lam(he, ae, hx, ax, patches, mt):
     if patches.get("away_rotation", 0) >= 4:
         la *= 0.5
     if hx >= 2.0 and ax <= 1.0:
-        if mt in ["final", "knockout"]:
+        if mt in ["final", "semi", "quarter", "round_16", "round_32"]:
             lh *= 1.5
         else:
             lh *= 2.0
@@ -408,12 +430,22 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
         db = 0.0
     if patches.get("odds_up", False):
         xs = max(0.5, xs - 0.5)
-    if mt == "final":
+    # ========== 各阶段系数 ==========
+    if mt == "group":
+        xs *= 1.0
+    elif mt == "round_32":
+        xs *= 0.98
+    elif mt == "round_16":
+        xs *= 0.95
+    elif mt == "quarter":
+        xs *= 0.92
+    elif mt == "semi":
+        xs *= 0.88
+    elif mt == "third":
+        xs *= 0.95
+    elif mt == "final":
         xs *= 0.85
-    elif mt == "knockout":
-        xs *= 0.9
-    elif mt == "slaughter":
-        xs *= 1.1
+
     if abs(ed) > 150:
         if ed > 0:
             dp = "主胜"
@@ -434,10 +466,13 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
     else:
         dp = "平局"
         ds = "主胜" if hx > ax else "客胜"
+
     if db > 0 and abs(hx - ax) < 0.3 and dp != "平局":
         dp, ds = "平局", dp
-    if mt in ["final", "knockout"] and dp == "主胜" and abs(hx - ax) < 0.5:
+
+    if mt in ["final", "semi", "quarter", "round_16", "round_32"] and dp == "主胜" and abs(hx - ax) < 0.5:
         dp, ds = "平局", dp
+
     if xs >= 3.5:
         gp = "3"
         gs = "4"
@@ -457,6 +492,7 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
     if xs >= 6.5:
         gp = "5"
         gs = "7+"
+
     gpi = int(gp) if gp.isdigit() else 0
     gsi = int(gs) if gs.isdigit() else 0
     sp = generate_dynamic_score(dp, gpi, he, ae, hx, ax)
@@ -621,11 +657,11 @@ def run_backtest(df, clf, reg, scaler, fcols):
     for i, g in enumerate(gw):
         if g in ['1', '2', '3']:
             if g == '1':
-                stage.append('小组赛（第1轮·试探）')
+                stage.append('小组赛（第1轮）')
             elif g == '2':
-                stage.append('小组赛（第2轮·关键战）')
+                stage.append('小组赛（第2轮）')
             else:
-                stage.append('小组赛（第3轮·生死战）')
+                stage.append('小组赛（第3轮）')
         else:
             if ('Jul 15' in df.iloc[i]['date_GMT'] or 'Dec 18' in df.iloc[i]['date_GMT']):
                 stage.append('决赛')
@@ -666,8 +702,8 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 2026 xG版")
-st.caption("基于 Elo + xG · 易经占卜 · 泊松分布 · 共振分析")
+st.title("⚽ V6.0 足球预测 · 48队完整版")
+st.caption("基于 Elo + xG · 易经占卜 · 泊松分布 · 共振分析 · 完整赛程阶段")
 
 with st.spinner("正在训练机器学习模型..."):
     clf, reg, scaler, fcols = train_models()
@@ -686,7 +722,7 @@ with st.expander("📋 输入比赛信息", expanded=True):
     match_time = st.time_input("比赛时间", datetime.time(0, 0))
     match_dt = datetime.datetime.combine(match_date, match_time)
 
-with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
+with st.expander("🔧 补丁设置 & 比赛阶段", expanded=False):
     cp1, cp2 = st.columns(2)
     with cp1:
         home_rot = st.number_input("主队轮换人数(≥4触发补丁①)", min_value=0, max_value=11, value=0, step=1)
@@ -697,11 +733,19 @@ with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
         st.caption("补丁④（半场落后≥2球）需临场数据，暂不设开关。")
         st.caption("补丁⑤（屠杀局）根据xG自动调整。")
 
-match_type = st.selectbox("比赛性质", ["常规", "淘汰赛", "决赛", "保级/出线生死战", "强弱悬殊"])
+match_type = st.selectbox("比赛阶段", [
+    "小组赛",
+    "1/16决赛",
+    "1/8决赛",
+    "1/4决赛",
+    "半决赛",
+    "季军赛",
+    "决赛"
+])
 
 if st.button("🔮 开始推演", use_container_width=True):
     if home not in TEAM_DATA or away not in TEAM_DATA:
-        st.error("❌ 输入的球队不在32强数据池中，请检查名称（如：巴西、日本）")
+        st.error("❌ 输入的球队不在48队数据池中，请检查名称是否正确")
     else:
         he = TEAM_DATA[home]["elo"]
         hx = TEAM_DATA[home]["xg"]
@@ -709,8 +753,15 @@ if st.button("🔮 开始推演", use_container_width=True):
         ax = TEAM_DATA[away]["xg"]
         st.success(f"✅ 主队 {home}: ELO={he}, xG={hx}")
         st.success(f"✅ 客队 {away}: ELO={ae}, xG={ax}")
-        mt_map = {"常规": "general", "淘汰赛": "knockout", "决赛": "final",
-                  "保级/出线生死战": "draw", "强弱悬殊": "slaughter"}
+        mt_map = {
+            "小组赛": "group",
+            "1/16决赛": "round_32",
+            "1/8决赛": "round_16",
+            "1/4决赛": "quarter",
+            "半决赛": "semi",
+            "季军赛": "third",
+            "决赛": "final"
+        }
         mtk = mt_map[match_type]
         patches = {"home_rotation": home_rot, "away_rotation": away_rot,
                    "draw_to_advance": "none" if dta == "无" else ("home" if dta == "主队" else "away"),
@@ -837,11 +888,23 @@ if st.button("🔮 开始推演", use_container_width=True):
 
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
+        stage_display = {
+            "group": "小组赛",
+            "round_32": "1/16决赛",
+            "round_16": "1/8决赛",
+            "quarter": "1/4决赛",
+            "semi": "半决赛",
+            "third": "季军赛",
+            "final": "决赛"
+        }
         st.markdown(f"""
         <div class="four-step">
             <div class="step-card"><span class="step-number">① 胜平负</span><br><span class="step-primary">首推：{res['direction_primary']}</span><br><span class="step-secondary">次推：{res['direction_secondary']}</span></div>
             <div class="step-card"><span class="step-number">② 总进球数</span><br><span class="step-primary">首推：{res['goal_primary']}球</span><br><span class="step-secondary">次推：{res['goal_secondary']}球</span></div>
             <div class="step-card"><span class="step-number">③ 比分（精准）</span><br><span class="step-primary">首推：{res['score_primary']}</span><br><span class="step-secondary">次推：{res['score_secondary']}</span></div>
+            <div class="step-card" style="margin-top:8px;background:rgba(255,255,255,0.05);border-radius:8px;padding:8px;text-align:center">
+                <span style="color:#f1c40f;font-size:14px;">📍 {stage_display.get(mtk, match_type)} · 系数 { {'group':'1.00','round_32':'0.98','round_16':'0.95','quarter':'0.92','semi':'0.88','third':'0.95','final':'0.85'}.get(mtk, '1.00') }</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         st.caption("补丁状态：" + (
@@ -859,14 +922,14 @@ if st.button("🔮 开始推演", use_container_width=True):
             "时间": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
             "主队": home,
             "客队": away,
-            "比赛性质": match_type,
+            "比赛阶段": match_type,
             "首推方向": res['direction_primary'],
             "首推比分": res['score_primary'],
             "次推比分": res['score_secondary']
         })
         st.toast("✅ 预测已保存至历史记录！", icon="💾")
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 · 无赔率无胜率")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 48队完整版")
 
 st.divider()
 st.markdown("## 📊 回测历史数据（2018+2022）")
