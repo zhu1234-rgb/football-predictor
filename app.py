@@ -715,24 +715,24 @@ with st.expander("📋 输入比赛信息", expanded=True):
     co = st.columns(3)
     with co[0]:
         st.caption("胜平负")
-        odds_h = st.number_input("主胜", 2.0, 0.1, min_value=1.0)
-        odds_d = st.number_input("平局", 3.2, 0.1, min_value=1.0)
-        odds_a = st.number_input("客胜", 3.5, 0.1, min_value=1.0)
+        odds_h = st.number_input("主胜", value=2.0, step=0.1, min_value=1.0)
+        odds_d = st.number_input("平局", value=3.2, step=0.1, min_value=1.0)
+        odds_a = st.number_input("客胜", value=3.5, step=0.1, min_value=1.0)
     with co[1]:
         st.caption("让球")
         hc = st.selectbox("让球数", [-3, -2, -1, 0, 1, 2, 3],
                           format_func=lambda x: f"主队{'+' if x < 0 else '-'}{abs(x)}" if x else "平手", index=2)
-        odds_hc_h = st.number_input("让胜", 3.5, 0.1, min_value=1.0)
-        odds_hc_d = st.number_input("让平", 3.4, 0.1, min_value=1.0)
-        odds_hc_a = st.number_input("让负", 2.0, 0.1, min_value=1.0)
+        odds_hc_h = st.number_input("让胜", value=3.5, step=0.1, min_value=1.0)
+        odds_hc_d = st.number_input("让平", value=3.4, step=0.1, min_value=1.0)
+        odds_hc_a = st.number_input("让负", value=2.0, step=0.1, min_value=1.0)
     with co[2]:
         st.caption("总进球/比分（已内嵌）")
 
 with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
     cp1, cp2 = st.columns(2)
     with cp1:
-        home_rot = st.number_input("主队轮换人数(≥4触发补丁①)", 0, 11, 0, 1)
-        away_rot = st.number_input("客队轮换人数(≥4触发补丁①)", 0, 11, 0, 1)
+        home_rot = st.number_input("主队轮换人数(≥4触发补丁①)", min_value=0, max_value=11, value=0, step=1)
+        away_rot = st.number_input("客队轮换人数(≥4触发补丁①)", min_value=0, max_value=11, value=0, step=1)
         dta = st.selectbox("打平即可出线（补丁②）", ["无", "主队", "客队"])
         odds_up = st.checkbox("大小球盘口升盘（补丁③诱大警报）")
     with cp2:
