@@ -13,6 +13,9 @@ import xgboost as xgb
 
 st.set_page_config(page_title="V6.0 足球预测 · 2026 xG版", page_icon="⚽", layout="centered", initial_sidebar_state="collapsed")
 
+if 'predict_history' not in st.session_state:
+    st.session_state.predict_history = []
+
 @st.cache_data
 def load_team_data():
     return {
@@ -50,7 +53,6 @@ def load_team_data():
         "美国": {"elo": 1781, "xg": 1.78, "form": 0.67, "group_goals": 6, "group_rank": 1},
         "加拿大": {"elo": 1748, "xg": 2.35, "form": 0.67, "group_goals": 9, "group_rank": 1},
     }
-
 TEAM_DATA = load_team_data()
 
 BAGUA_WUXING = {"乾": "金", "兑": "金", "离": "火", "震": "木", "巽": "木", "坎": "水", "艮": "土", "坤": "土"}
@@ -193,7 +195,6 @@ def build_stroke_dict():
          "门": 3, "将": 9, "前": 9, "锋": 12, "中": 4, "后": 6, "卫": 3, "守": 6, "攻": 7, "防": 6,
          "战": 9, "术": 5, "体": 7, "能": 10, "心": 4, "理": 11, "气": 4, "势": 8}
     return b
-
 STROKE_DICT = build_stroke_dict()
 
 def count_strokes(name):
@@ -679,6 +680,7 @@ def run_backtest(df, clf, reg, scaler, fcols):
     return res, {'总准确率': acc, '总进球准确率': gacc, '比分准确率': sacc, '总场次': total,
                  '阶段统计': stage_stats, '混淆矩阵': cm, '混淆矩阵标签': ['客胜', '平局', '主胜']}
 
+# ==================== UI 界面 ====================
 st.markdown("""<style>
 .main{background:#f0f2f6}
 .result-box{background:#fff;border-radius:10px;padding:15px;margin:10px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
@@ -693,7 +695,7 @@ st.markdown("""<style>
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
 st.title("⚽ V6.0 足球预测 · 2026 xG版")
-st.caption("内置32强最新xG数据 + 2018/2022机器学习 + 易经占卜 + 杂占 + 回测")
+st.caption("内置32强最新xG数据 + 2018/2022机器学习 + 易经占卜 + 杂占 + 回测 + 泊松分布 + 凯利公式")
 
 with st.spinner("正在训练机器学习模型..."):
     clf, reg, scaler, fcols = train_models()
@@ -828,68 +830,52 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write(f"**λ主**：{lh:.2f}，**λ客**：{la:.2f}")
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
         if odds_h > 0 and odds_d > 0 and odds_a > 0:
-            st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")        
-# ---------- 泊松分布详细分析（新增） ----------
-st.markdown("### 📈 泊松分布明细")
-
-# 计算最常见比分及概率（0~4球）
-score_probs = {}
-for h in range(5):
-    for a in range(5):
-        prob = poisson_prob(lh, h) * poisson_prob(la, a)
-        score_probs[f"{h}-{a}"] = prob
-
-# 排序取前5
-sorted_scores = sorted(score_probs.items(), key=lambda x: x[1], reverse=True)[:5]
-
-st.write(f"**预期进球**：主队 {lh:.2f}，客队 {la:.2f}")
-st.write("**最可能出现的比分（前5）**：")
-for score, prob in sorted_scores:
-    st.write(f"  - {score}：{prob:.1%}")
-
-# 总进球数概率
-goal_probs = {}
-for total in range(9):  # 0~8+
-    prob = 0
-    for h in range(max(0, total-4), min(4, total)+1):
-        a = total - h
-        if 0 <= a <= 4:
-            prob += poisson_prob(lh, h) * poisson_prob(la, a)
-    goal_probs[total] = prob
-# 合并5+球
-goal_probs_agg = {}
-for t, p in goal_probs.items():
-    if t <= 4:
-        goal_probs_agg[str(t)] = p
-    else:
-        goal_probs_agg["5+"] = goal_probs_agg.get("5+", 0) + p
-
-st.write("**总进球数概率分布**：")
-for g, p in sorted(goal_probs_agg.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
-    st.write(f"  - {g} 球：{p:.1%}")
-
-# ---------- 凯利公式计算（新增） ----------
-st.markdown("### 💰 凯利公式投注建议")
-st.caption("凯利值 = (赔率 × 概率 - 1) / (赔率 - 1)，正值表示有投注价值，越大越值得。")
-
-if odds_h > 0 and odds_d > 0 and odds_a > 0:
-    kelly_h = (odds_h * hp - 1) / (odds_h - 1) if odds_h > 1 else 0
-    kelly_d = (odds_d * dp - 1) / (odds_d - 1) if odds_d > 1 else 0
-    kelly_a = (odds_a * ap - 1) / (odds_a - 1) if odds_a > 1 else 0
-    
-    st.write(f"**主胜**：凯利值 = {kelly_h:.3f}（{'✅ 有投注价值' if kelly_h > 0 else '❌ 不建议'}）")
-    st.write(f"**平局**：凯利值 = {kelly_d:.3f}（{'✅ 有投注价值' if kelly_d > 0 else '❌ 不建议'}）")
-    st.write(f"**客胜**：凯利值 = {kelly_a:.3f}（{'✅ 有投注价值' if kelly_a > 0 else '❌ 不建议'}）")
-    
-    # 最佳投注推荐
-    max_kelly = max(kelly_h, kelly_d, kelly_a)
-    if max_kelly > 0:
-        best_bet = ["主胜", "平局", "客胜"][[kelly_h, kelly_d, kelly_a].index(max_kelly)]
-        st.success(f"🏆 最佳投注选项：**{best_bet}**（凯利值 {max_kelly:.3f}）")
-    else:
-        st.warning("⚠️ 所有选项的凯利值均为负或零，建议观望或跳过。")
-else:
-    st.info("请先输入有效的胜平负赔率，凯利公式才能计算。")
+            st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")
+        st.markdown("### 📈 泊松分布明细")
+        score_probs = {}
+        for h in range(5):
+            for a in range(5):
+                prob = poisson_prob(lh, h) * poisson_prob(la, a)
+                score_probs[f"{h}-{a}"] = prob
+        sorted_scores = sorted(score_probs.items(), key=lambda x: x[1], reverse=True)[:5]
+        st.write(f"**预期进球**：主队 {lh:.2f}，客队 {la:.2f}")
+        st.write("**最可能出现的比分（前5）**：")
+        for score, prob in sorted_scores:
+            st.write(f"  - {score}：{prob:.1%}")
+        goal_probs = {}
+        for total in range(9):
+            prob = 0
+            for h in range(max(0, total-4), min(4, total)+1):
+                a = total - h
+                if 0 <= a <= 4:
+                    prob += poisson_prob(lh, h) * poisson_prob(la, a)
+            goal_probs[total] = prob
+        goal_probs_agg = {}
+        for t, p in goal_probs.items():
+            if t <= 4:
+                goal_probs_agg[str(t)] = p
+            else:
+                goal_probs_agg["5+"] = goal_probs_agg.get("5+", 0) + p
+        st.write("**总进球数概率分布**：")
+        for g, p in sorted(goal_probs_agg.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
+            st.write(f"  - {g} 球：{p:.1%}")
+        st.markdown("### 💰 凯利公式投注建议")
+        st.caption("凯利值 = (赔率 × 概率 - 1) / (赔率 - 1)，正值表示有投注价值，越大越值得。")
+        if odds_h > 0 and odds_d > 0 and odds_a > 0:
+            kelly_h = (odds_h * hp - 1) / (odds_h - 1) if odds_h > 1 else 0
+            kelly_d = (odds_d * dp - 1) / (odds_d - 1) if odds_d > 1 else 0
+            kelly_a = (odds_a * ap - 1) / (odds_a - 1) if odds_a > 1 else 0
+            st.write(f"**主胜**：凯利值 = {kelly_h:.3f}（{'✅ 有投注价值' if kelly_h > 0 else '❌ 不建议'}）")
+            st.write(f"**平局**：凯利值 = {kelly_d:.3f}（{'✅ 有投注价值' if kelly_d > 0 else '❌ 不建议'}）")
+            st.write(f"**客胜**：凯利值 = {kelly_a:.3f}（{'✅ 有投注价值' if kelly_a > 0 else '❌ 不建议'}）")
+            max_kelly = max(kelly_h, kelly_d, kelly_a)
+            if max_kelly > 0:
+                best_bet = ["主胜", "平局", "客胜"][[kelly_h, kelly_d, kelly_a].index(max_kelly)]
+                st.success(f"🏆 最佳投注选项：**{best_bet}**（凯利值 {max_kelly:.3f}）")
+            else:
+                st.warning("⚠️ 所有选项的凯利值均为负或零，建议观望或跳过。")
+        else:
+            st.info("请先输入有效的胜平负赔率，凯利公式才能计算。")
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
         res = four_step_predict(home, away, mtk, he, ae, hx, ax, hf, af, hc, patches)
@@ -913,8 +899,18 @@ else:
                 st.caption(f"五行：{y['wuxing']}，六亲：{y['liuqin']}（{LIUQIN_MAP.get(y['liuqin'], '')}），吉凶：{y['jixiong']}")
                 st.write(y['text'])
                 st.markdown("---")
+        st.session_state.predict_history.append({
+            "时间": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "主队": home,
+            "客队": away,
+            "比赛性质": match_type,
+            "首推方向": res['direction_primary'],
+            "首推比分": res['score_primary'],
+            "次推比分": res['score_secondary']
+        })
+        st.toast("✅ 预测已保存至历史记录！", icon="💾")
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 + 机器学习增强")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 2026 xG版 + 泊松分布 + 凯利公式")
 
 st.divider()
 st.markdown("## 📊 回测历史数据（2018+2022）")
@@ -952,3 +948,16 @@ if st.button("📊 执行回测", use_container_width=True):
             st.dataframe(results_df)
         csv = results_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 下载回测结果CSV", data=csv, file_name="backtest_results.csv", mime="text/csv")
+
+st.divider()
+st.markdown("## 📋 我的预测历史")
+if st.session_state.predict_history:
+    df_history = pd.DataFrame(st.session_state.predict_history)
+    st.dataframe(df_history, use_container_width=True, hide_index=True)
+    col_clear1, col_clear2 = st.columns([1, 5])
+    with col_clear1:
+        if st.button("🗑️ 清空历史", use_container_width=True):
+            st.session_state.predict_history = []
+            st.rerun()
+else:
+    st.info("📭 暂无预测记录，点击「开始推演」后会自动保存。")
