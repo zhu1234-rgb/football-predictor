@@ -1,72 +1,80 @@
-# V6.0 足球预测 · 全自动球队数据版（赔率/让球手动）
-# 输入球队名称自动匹配数据，赔率和让球数手动输入
+# -*- coding: utf-8 -*-
+"""
+V6.0 足球预测 · 完整数据版（机器学习 + 易经 + 杂占 + 回测）
+整合了 2018/2022 世界杯历史数据训练模型，支持单场预测与批量回测。
+"""
 
 import streamlit as st
+import pandas as pd
+import numpy as np
 import math
 import datetime
 import re
+import os
+import pickle
+from functools import lru_cache
 
-# ---------- PWA 配置 ----------
-st.markdown(
-    '<link rel="manifest" href="manifest.json">',
-    unsafe_allow_html=True
-)
-st.markdown("""
-    <link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/color/96/000000/football2.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="https://img.icons8.com/color/96/000000/football2.png">
-""", unsafe_allow_html=True)
+# 机器学习库
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix
+import xgboost as xgb
 
+# ---------- 页面配置 ----------
 st.set_page_config(
-    page_title="V6.0 足球预测",
+    page_title="V6.0 足球预测 · 完整版（含回测）",
     page_icon="⚽",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# ================== 32强球队完整数据池 ==================
-TEAM_DATA = {
-    # 南美区
-    "阿根廷": {"elo": 2148, "xg": 2.18, "form": 0.67},
-    "巴西": {"elo": 2099, "xg": 2.06, "form": 0.67},
-    "哥伦比亚": {"elo": 2004, "xg": 1.52, "form": 0.67},
-    "厄瓜多尔": {"elo": 1902, "xg": 1.80, "form": 0.67},
-    "巴拉圭": {"elo": 1815, "xg": 0.25, "form": 0.33},
-    "乌拉圭": {"elo": 1841, "xg": 1.32, "form": 0.33},
-    # 欧洲区
-    "西班牙": {"elo": 2144, "xg": 2.19, "form": 0.67},
-    "法国": {"elo": 2123, "xg": 1.65, "form": 0.67},
-    "英格兰": {"elo": 2038, "xg": 2.24, "form": 0.67},
-    "葡萄牙": {"elo": 1990, "xg": 1.19, "form": 0.33},
-    "荷兰": {"elo": 1980, "xg": 1.55, "form": 0.67},
-    "挪威": {"elo": 1918, "xg": 1.79, "form": 0.67},
-    "德国": {"elo": 1916, "xg": 2.46, "form": 0.67},
-    "瑞士": {"elo": 1914, "xg": 2.22, "form": 0.67},
-    "克罗地亚": {"elo": 1905, "xg": 0.90, "form": 0.33},
-    "比利时": {"elo": 1884, "xg": 2.18, "form": 0.67},
-    "奥地利": {"elo": 1836, "xg": 1.10, "form": 0.33},
-    "瑞典": {"elo": 1742, "xg": 1.32, "form": 0.33},
-    "波黑": {"elo": 1622, "xg": 0.33, "form": 0.33},
-    # 非洲区
-    "摩洛哥": {"elo": 1877, "xg": 1.42, "form": 0.67},
-    "塞内加尔": {"elo": 1842, "xg": 1.71, "form": 0.67},
-    "科特迪瓦": {"elo": 1743, "xg": 0.67, "form": 0.33},
-    "阿尔及利亚": {"elo": 1785, "xg": 1.33, "form": 0.33},
-    "埃及": {"elo": 1742, "xg": 1.25, "form": 0.33},
-    "加纳": {"elo": 1575, "xg": 0.44, "form": 0.33},
-    "南非": {"elo": 1575, "xg": 0.82, "form": 0.33},
-    "民主刚果": {"elo": 1712, "xg": 0.16, "form": 0.33},
-    "佛得角": {"elo": 1622, "xg": 0.29, "form": 0.33},
-    # 亚洲区
-    "日本": {"elo": 1910, "xg": 0.97, "form": 0.67},
-    "澳大利亚": {"elo": 1800, "xg": 0.58, "form": 0.33},
-    # 中北美及加勒比
-    "墨西哥": {"elo": 1912, "xg": 1.41, "form": 0.33},
-    "美国": {"elo": 1781, "xg": 1.75, "form": 0.67},
-    "加拿大": {"elo": 1748, "xg": 2.33, "form": 0.67},
-}
+# ---------- 全局数据 ----------
+@st.cache_data
+def load_team_data():
+    return {
+        # 南美区
+        "阿根廷": {"elo": 2148, "xg": 2.18, "form": 0.67, "group_goals": 7, "group_rank": 1},
+        "巴西": {"elo": 2099, "xg": 2.06, "form": 0.67, "group_goals": 6, "group_rank": 1},
+        "哥伦比亚": {"elo": 2004, "xg": 1.52, "form": 0.67, "group_goals": 5, "group_rank": 1},
+        "厄瓜多尔": {"elo": 1902, "xg": 1.80, "form": 0.67, "group_goals": 6, "group_rank": 2},
+        "巴拉圭": {"elo": 1815, "xg": 0.25, "form": 0.33, "group_goals": 2, "group_rank": 2},
+        "乌拉圭": {"elo": 1841, "xg": 1.32, "form": 0.33, "group_goals": 3, "group_rank": 2},
+        # 欧洲区
+        "西班牙": {"elo": 2144, "xg": 2.19, "form": 0.67, "group_goals": 8, "group_rank": 1},
+        "法国": {"elo": 2123, "xg": 1.65, "form": 0.67, "group_goals": 10, "group_rank": 1},
+        "英格兰": {"elo": 2038, "xg": 2.24, "form": 0.67, "group_goals": 8, "group_rank": 1},
+        "葡萄牙": {"elo": 1990, "xg": 1.19, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "荷兰": {"elo": 1980, "xg": 1.55, "form": 0.67, "group_goals": 10, "group_rank": 1},
+        "挪威": {"elo": 1918, "xg": 1.79, "form": 0.67, "group_goals": 8, "group_rank": 1},
+        "德国": {"elo": 1916, "xg": 2.46, "form": 0.67, "group_goals": 10, "group_rank": 1},
+        "瑞士": {"elo": 1914, "xg": 2.22, "form": 0.67, "group_goals": 7, "group_rank": 1},
+        "克罗地亚": {"elo": 1905, "xg": 0.90, "form": 0.33, "group_goals": 3, "group_rank": 2},
+        "比利时": {"elo": 1884, "xg": 2.18, "form": 0.67, "group_goals": 8, "group_rank": 1},
+        "奥地利": {"elo": 1836, "xg": 1.10, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "瑞典": {"elo": 1742, "xg": 1.32, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "波黑": {"elo": 1622, "xg": 0.33, "form": 0.33, "group_goals": 2, "group_rank": 3},
+        # 非洲区
+        "摩洛哥": {"elo": 1877, "xg": 1.42, "form": 0.67, "group_goals": 5, "group_rank": 1},
+        "塞内加尔": {"elo": 1842, "xg": 1.71, "form": 0.67, "group_goals": 6, "group_rank": 1},
+        "科特迪瓦": {"elo": 1743, "xg": 0.67, "form": 0.33, "group_goals": 3, "group_rank": 2},
+        "阿尔及利亚": {"elo": 1785, "xg": 1.33, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "埃及": {"elo": 1742, "xg": 1.25, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "加纳": {"elo": 1575, "xg": 0.44, "form": 0.33, "group_goals": 2, "group_rank": 3},
+        "南非": {"elo": 1575, "xg": 0.82, "form": 0.33, "group_goals": 2, "group_rank": 2},
+        "民主刚果": {"elo": 1712, "xg": 0.16, "form": 0.33, "group_goals": 1, "group_rank": 3},
+        "佛得角": {"elo": 1622, "xg": 0.29, "form": 0.33, "group_goals": 1, "group_rank": 3},
+        # 亚洲区
+        "日本": {"elo": 1910, "xg": 0.97, "form": 0.67, "group_goals": 4, "group_rank": 2},
+        "澳大利亚": {"elo": 1800, "xg": 0.58, "form": 0.33, "group_goals": 2, "group_rank": 2},
+        # 中北美及加勒比
+        "墨西哥": {"elo": 1912, "xg": 1.41, "form": 0.33, "group_goals": 4, "group_rank": 2},
+        "美国": {"elo": 1781, "xg": 1.75, "form": 0.67, "group_goals": 6, "group_rank": 1},
+        "加拿大": {"elo": 1748, "xg": 2.33, "form": 0.67, "group_goals": 9, "group_rank": 1},
+    }
 
-# ================== 核心库 ==================
+TEAM_DATA = load_team_data()
 
+# ---------- 易经核心常量 ----------
 BAGUA_WUXING = {
     "乾": "金", "兑": "金", "离": "火", "震": "木",
     "巽": "木", "坎": "水", "艮": "土", "坤": "土"
@@ -77,7 +85,6 @@ BAGUA_LEIXIANG = {
 }
 LIUYAO_WEI = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
 LIUYAO_GONG = ["震（足）", "离（眼/心）", "艮（手/肩）", "巽（股/财）", "坎（耳/肾）", "兑（口/肺）"]
-
 LIUQIN_MAP = {
     "父母": "教练组/战术体系/文书",
     "官鬼": "中场控制/裁判/领导",
@@ -85,8 +92,9 @@ LIUQIN_MAP = {
     "兄弟": "队友/对手/竞争",
     "子孙": "替补/年轻球员/福神"
 }
+SHICHEN = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
 
-# ---------- 六十四卦辞象 ----------
+# 六十四卦辞象（完整）
 GUA_DICT = {
     "乾乾": {"name": "乾为天", "gua_ci": "元亨利贞。", "xiang_ci": "天行健，君子以自强不息。"},
     "坤坤": {"name": "坤为地", "gua_ci": "元亨，利牝马之贞。君子有攸往，先迷后得主，利西南得朋，东北丧朋，安贞吉。", "xiang_ci": "地势坤，君子以厚德载物。"},
@@ -154,23 +162,7 @@ GUA_DICT = {
     "离坎": {"name": "火水未济", "gua_ci": "亨，小狐汔济，濡其尾，无攸利。", "xiang_ci": "火在水上，未济，君子以慎辨物居方。"}
 }
 
-# ---------- 工具函数 ----------
-def get_wuxing(gua):
-    return BAGUA_WUXING.get(gua, "土")
-
-def get_liuqin(body_wuxing, yao_wuxing):
-    relations = {
-        ("金","木"): "官鬼", ("金","火"): "妻财", ("金","土"): "父母", ("金","金"): "兄弟",
-        ("木","金"): "妻财", ("木","火"): "子孙", ("木","土"): "官鬼", ("木","木"): "兄弟",
-        ("水","金"): "父母", ("水","火"): "官鬼", ("水","土"): "妻财", ("水","木"): "子孙",
-        ("火","金"): "官鬼", ("火","木"): "父母", ("火","土"): "子孙", ("火","火"): "兄弟",
-        ("土","金"): "子孙", ("土","木"): "妻财", ("土","水"): "官鬼", ("土","火"): "父母",
-    }
-    return relations.get((body_wuxing, yao_wuxing), "比和")
-
-# ================== 古代杂占 ==================
-SHICHEN = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-
+# 古代杂占字典（完整）
 MIAN_RE = {
     "子": "主喜庆事，主得财。", "丑": "主有烦恼、忧愁之事。",
     "寅": "主有客来，大吉。", "卯": "主有酒食及外人至。",
@@ -268,50 +260,62 @@ QUE_ZAO = {
     "戌": "主有财帛亨通，大吉。", "亥": "主有口舌争斗之事。"
 }
 
-def get_shichen_from_time(match_time):
-    hour = match_time.hour
-    shichen_index = (hour + 1) // 2 % 12
-    return SHICHEN[shichen_index]
+# ---------- 易经工具函数 ----------
+def get_wuxing(gua):
+    return BAGUA_WUXING.get(gua, "土")
 
-# ================== 笔画起卦函数 ==================
+def get_liuqin(body_wuxing, yao_wuxing):
+    relations = {
+        ("金","木"): "官鬼", ("金","火"): "妻财", ("金","土"): "父母", ("金","金"): "兄弟",
+        ("木","金"): "妻财", ("木","火"): "子孙", ("木","土"): "官鬼", ("木","木"): "兄弟",
+        ("水","金"): "父母", ("水","火"): "官鬼", ("水","土"): "妻财", ("水","木"): "子孙",
+        ("火","金"): "官鬼", ("火","木"): "父母", ("火","土"): "子孙", ("火","火"): "兄弟",
+        ("土","金"): "子孙", ("土","木"): "妻财", ("土","水"): "官鬼", ("土","火"): "父母",
+    }
+    return relations.get((body_wuxing, yao_wuxing), "比和")
+
+def build_stroke_dict():
+    base = {
+        "德":15,"国":8,"西":6,"班":10,"牙":4,"南":9,"非":8,"加":5,"拿":10,"大":3,
+        "巴":4,"阿":7,"根":10,"廷":6,"法":8,"意":13,"利":7,"英":8,"格":10,"兰":5,
+        "葡":12,"萄":11,"荷":10,"比":4,"瑞":13,"士":3,"丹":4,"麦":7,"挪":10,"威":9,
+        "捷":11,"克":7,"奥":12,"地":6,"匈":6,"希":7,"腊":12,"俄":9,"罗":8,"马":3,"尼":5,
+        "日":4,"本":5,"韩":12,"伊":6,"朗":10,"沙":7,"特":10,"拉":8,"伯":7,"墨":15,"哥":10,
+        "美":9,"乌":4,"圭":6,"卡":5,"塔":12,"尔":5,"塞":13,"内":4,"亚":6,"洪":9,"都":10,
+        "斯":12,"厄":4,"瓜":5,"多":6,"智":12,"秘":10,"鲁":12,"委":8,"新":13,"澳":15,
+        "台":5,"港":12,"门":3,"朝":12,"鲜":14,"越":12,"泰":10,"印":5,"度":9,"菲":11,
+        "律":9,"宾":10,"坡":8,"来":7,"达":6,"黎":15,"嫩":14,"以":4,"色":6,"列":6,"约":6,
+        "旦":5,"叙":9,"曼":11,"苏":7,"中":4,"刚":6,"果":8,"佛":7,"角":7,"克":7,
+        "罗":8,"地":6,"尼":5,"亚":6,"利":7,"比":4,"时":7,"间":7,"赛":17,"预":13,
+        "测":10,"优":6,"化":4,"版":8,"队":4,"员":7,"教":11,"练":8,"裁":12,"判":7,
+        "门":3,"将":9,"前":9,"锋":12,"中":4,"后":6,"卫":3,"守":6,"攻":7,"防":6,
+        "战":9,"术":5,"体":7,"能":10,"心":4,"理":11,"气":4,"势":8
+    }
+    return base
+
+STROKE_DICT = build_stroke_dict()
 
 def count_strokes(name):
-    stroke_dict = {
-        "德": 15, "国": 8, "西": 6, "班": 10, "牙": 4,
-        "南": 9, "非": 8, "加": 5, "拿": 10, "大": 3,
-        "巴": 4, "西": 6, "阿": 7, "根": 10, "廷": 6,
-        "法": 8, "意": 13, "利": 7, "英": 8, "格": 10, "兰": 5,
-        "葡": 12, "萄": 11, "牙": 4, "荷": 10, "比": 4,
-        "瑞": 13, "士": 3, "丹": 4, "麦": 7, "挪": 10, "威": 9,
-        "捷": 11, "克": 7, "奥": 12, "地": 6, "匈": 6,
-        "希": 7, "腊": 12, "俄": 9, "罗": 8, "马": 3, "尼": 5,
-        "日": 4, "本": 5, "韩": 12, "伊": 6, "朗": 10,
-        "沙": 7, "特": 10, "阿": 7, "拉": 8, "伯": 7,
-        "墨": 15, "哥": 10, "美": 9, "加": 5, "拿": 10, "大": 3,
-        "乌": 4, "拉": 8, "圭": 6, "卡": 5, "塔": 12, "尔": 5,
-        "塞": 13, "内": 4, "加": 5, "尔": 5, "尼": 5, "亚": 6,
-        "洪": 9, "都": 10, "拉": 8, "斯": 12, "哥": 10,
-        "厄": 4, "瓜": 5, "多": 6, "尔": 5,
-        "智": 12, "利": 7, "秘": 10, "鲁": 12,
-        "委": 8, "内": 4, "瑞": 13, "拉": 8,
-        "新": 13, "西": 6, "兰": 5, "澳": 15, "大": 3,
-        "中": 4, "台": 5, "港": 12, "澳": 15, "门": 3,
-        "朝": 12, "鲜": 14, "越": 12, "泰": 10, "印": 5, "度": 9,
-        "菲": 11, "律": 9, "宾": 10, "新": 13, "加": 5, "坡": 8,
-        "马": 3, "来": 7, "西": 6, "亚": 6,
-        "哥": 10, "斯": 12, "达": 6, "黎": 15, "巴": 4,
-        "嫩": 14, "以": 4, "色": 6, "列": 6, "约": 6, "旦": 5,
-        "叙": 9, "利": 7, "亚": 6, "伊": 6, "拉": 8, "克": 7,
-        "阿": 7, "曼": 11, "苏": 7, "丹": 4, "南": 9, "苏": 7,
-        "南": 9, "非": 8, "中": 4, "国": 8,
-    }
     total = 0
     for char in name:
-        if char in stroke_dict:
-            total += stroke_dict[char]
+        if char in STROKE_DICT:
+            total += STROKE_DICT[char]
         else:
             total += 5
     return total
+
+def get_inter_gua(upper, lower):
+    gua_map = {
+        "乾": [1,1,1], "兑": [0,1,1], "离": [1,0,1], "震": [0,0,1],
+        "巽": [1,1,0], "坎": [0,1,0], "艮": [1,0,0], "坤": [0,0,0]
+    }
+    upper_bits = gua_map[upper]
+    lower_bits = gua_map[lower]
+    full = lower_bits + upper_bits
+    lower_inter = full[1:4]
+    upper_inter = full[2:5]
+    rev_map = {tuple(v): k for k, v in gua_map.items()}
+    return rev_map[tuple(upper_inter)], rev_map[tuple(lower_inter)]
 
 def generate_gua_info(home, away):
     clean_home = re.sub(r'[^\u4e00-\u9fa5]', '', home)
@@ -326,20 +330,25 @@ def generate_gua_info(home, away):
     moving_yao = total_strokes % 6
     if moving_yao == 0: moving_yao = 6
     num_to_gua = {1:"乾",2:"兑",3:"离",4:"震",5:"巽",6:"坎",7:"艮",8:"坤"}
-    upper = num_to_gua.get(upper_num, "乾")
-    lower = num_to_gua.get(lower_num, "乾")
+    upper = num_to_gua[upper_num]
+    lower = num_to_gua[lower_num]
     reverse = {"乾":"坤","坤":"乾","震":"巽","巽":"震","坎":"离","离":"坎","艮":"兑","兑":"艮"}
     change_upper = reverse.get(upper, upper)
     change_lower = reverse.get(lower, lower)
-    inter_upper = "坎" if upper != "坤" else "坤"
-    inter_lower = "离" if lower != "坤" else "坤"
-    body = upper; use = lower
-    body_wuxing = get_wuxing(body); use_wuxing = get_wuxing(use)
+    inter_upper, inter_lower = get_inter_gua(upper, lower)
+    body = upper
+    use = lower
+    body_wuxing = get_wuxing(body)
+    use_wuxing = get_wuxing(use)
     if body_wuxing == use_wuxing:
         ti_yong = "比和（平局相）"
-    elif (body_wuxing == "木" and use_wuxing == "土") or (body_wuxing == "火" and use_wuxing == "金") or (body_wuxing == "土" and use_wuxing == "水") or (body_wuxing == "金" and use_wuxing == "木") or (body_wuxing == "水" and use_wuxing == "火"):
+    elif (body_wuxing == "木" and use_wuxing == "土") or (body_wuxing == "火" and use_wuxing == "金") or \
+         (body_wuxing == "土" and use_wuxing == "水") or (body_wuxing == "金" and use_wuxing == "木") or \
+         (body_wuxing == "水" and use_wuxing == "火"):
         ti_yong = "体克用（主队制胜）"
-    elif (use_wuxing == "木" and body_wuxing == "土") or (use_wuxing == "火" and body_wuxing == "金") or (use_wuxing == "土" and body_wuxing == "水") or (use_wuxing == "金" and body_wuxing == "木") or (use_wuxing == "水" and body_wuxing == "火"):
+    elif (use_wuxing == "木" and body_wuxing == "土") or (use_wuxing == "火" and body_wuxing == "金") or \
+         (use_wuxing == "土" and body_wuxing == "水") or (use_wuxing == "金" and body_wuxing == "木") or \
+         (use_wuxing == "水" and body_wuxing == "火"):
         ti_yong = "用克体（客队制胜）"
     else:
         ti_yong = "相生（平和）"
@@ -362,8 +371,6 @@ def generate_gua_info(home, away):
         "away_strokes": away_strokes,
         "total_strokes": total_strokes
     }
-
-# ================== 六爻分析 ==================
 
 def analyze_yao(gua_info, match_type, home, away):
     body_wuxing = gua_info["body_wuxing"]
@@ -459,8 +466,12 @@ def full_gua_analysis(home, away, match_type):
         "bing_yao": bing_yao
     }
 
-# ================== 量化计算 ==================
+def get_shichen_from_time(match_time):
+    hour = match_time.hour
+    shichen_index = (hour + 1) // 2 % 12
+    return SHICHEN[shichen_index]
 
+# ---------- 传统量化（保留） ----------
 def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, match_type):
     elo_factor = (home_elo - away_elo) / 2000 * 0.4
     xg_factor = (home_xg / (home_xg + away_xg + 0.01)) * 0.4
@@ -484,8 +495,6 @@ def compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patc
 
 def poisson_prob(lam, goals):
     return (math.exp(-lam) * (lam ** goals)) / math.factorial(goals)
-
-# ================== 动态比分生成 ==================
 
 def generate_dynamic_score(dir_primary, goals_int, handicap_num, home_elo, away_elo, home_xg, away_xg, home_form, away_form):
     elo_diff = home_elo - away_elo
@@ -546,8 +555,6 @@ def generate_dynamic_score(dir_primary, goals_int, handicap_num, home_elo, away_
         else:
             return "0:0"
 
-# ================== 四层推演 ==================
-
 def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_xg, home_form, away_form,
                       handicap_num, patches):
     elo_diff = home_elo - away_elo
@@ -572,7 +579,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     elif match_type == "slaughter":
         xg_sum = xg_sum * 1.1
 
-    # ----- 胜平负 -----
+    # 胜平负
     if abs(elo_diff) > 150:
         if elo_diff > 0:
             dir_primary = "主胜"; dir_secondary = "平局"
@@ -595,7 +602,7 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     if match_type in ["final", "knockout"] and dir_primary == "主胜" and abs(home_xg - away_xg) < 0.5:
         dir_primary, dir_secondary = "平局", dir_primary
 
-    # ----- 总进球 -----
+    # 总进球
     if xg_sum >= 3.5:
         goal_primary = "3"; goal_secondary = "4"
     elif xg_sum >= 2.5:
@@ -611,7 +618,6 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
     if xg_sum >= 6.5:
         goal_primary = "5"; goal_secondary = "7+"
 
-    # ----- 动态比分 -----
     goal_prim_int = int(goal_primary) if goal_primary.isdigit() else 0
     goal_sec_int = int(goal_secondary) if goal_secondary.isdigit() else 0
 
@@ -669,8 +675,190 @@ def four_step_predict(home, away, match_type, home_elo, away_elo, home_xg, away_
         "lam_a": away_xg,
     }
 
-# ================== 界面UI ==================
+# ---------- 机器学习训练 ----------
+@st.cache_resource
+def train_models():
+    files = [
+        "international-fifa-world-cup-2018-russia-matches-2018-to-2018-stats.csv",
+        "international-fifa-world-cup-2022-qatar-matches-2022-to-2022-stats.csv"
+    ]
+    dfs = []
+    for f in files:
+        if os.path.exists(f):
+            df = pd.read_csv(f)
+            dfs.append(df)
+    if not dfs:
+        return None, None, None, None
 
+    df_all = pd.concat(dfs, ignore_index=True)
+    df = df_all[['home_team_name', 'away_team_name', 'home_team_goal_count', 'away_team_goal_count',
+                 'home_team_shots', 'away_team_shots', 'home_team_shots_on_target', 'away_team_shots_on_target',
+                 'home_team_corner_count', 'away_team_corner_count', 'home_team_possession', 'away_team_possession',
+                 'home_team_fouls', 'away_team_fouls', 'home_team_yellow_cards', 'away_team_yellow_cards',
+                 'Home Team Pre-Match xG', 'Away Team Pre-Match xG']].copy()
+    df.dropna(inplace=True)
+
+    df['goal_diff'] = df['home_team_goal_count'] - df['away_team_goal_count']
+    df['shots_diff'] = df['home_team_shots'] - df['away_team_shots']
+    df['shots_on_target_diff'] = df['home_team_shots_on_target'] - df['away_team_shots_on_target']
+    df['corner_diff'] = df['home_team_corner_count'] - df['away_team_corner_count']
+    df['possession_diff'] = df['home_team_possession'] - df['away_team_possession']
+    df['foul_diff'] = df['home_team_fouls'] - df['away_team_fouls']
+    df['yellow_diff'] = df['home_team_yellow_cards'] - df['away_team_yellow_cards']
+    df['xG_diff'] = df['Home Team Pre-Match xG'] - df['Away Team Pre-Match xG']
+
+    df['result'] = np.where(df['goal_diff'] > 0, 2, np.where(df['goal_diff'] == 0, 1, 0))
+    df['total_goals'] = df['home_team_goal_count'] + df['away_team_goal_count']
+
+    feature_cols = ['shots_diff', 'shots_on_target_diff', 'corner_diff',
+                    'possession_diff', 'foul_diff', 'yellow_diff', 'xG_diff']
+    X = df[feature_cols]
+    y_result = df['result']
+    y_goals = np.clip(df['total_goals'], 0, 5)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    clf = xgb.XGBClassifier(objective='multi:softprob', num_class=3, random_state=42)
+    clf.fit(X_scaled, y_result)
+
+    reg = RandomForestClassifier(n_estimators=100, random_state=42)
+    reg.fit(X_scaled, y_goals)
+
+    return clf, reg, scaler, feature_cols
+
+def predict_match(clf, reg, scaler, feature_cols, home, away, home_stats, away_stats):
+    if clf is None:
+        return None
+    diff = {
+        'shots_diff': home_stats.get('shots', 0) - away_stats.get('shots', 0),
+        'shots_on_target_diff': home_stats.get('shots_on_target', 0) - away_stats.get('shots_on_target', 0),
+        'corner_diff': home_stats.get('corners', 0) - away_stats.get('corners', 0),
+        'possession_diff': home_stats.get('possession', 50) - away_stats.get('possession', 50),
+        'foul_diff': home_stats.get('fouls', 0) - away_stats.get('fouls', 0),
+        'yellow_diff': home_stats.get('yellow_cards', 0) - away_stats.get('yellow_cards', 0),
+        'xG_diff': home_stats.get('xg', 0) - away_stats.get('xg', 0)
+    }
+    X = np.array([[diff[c] for c in feature_cols]])
+    X_scaled = scaler.transform(X)
+    result_probs = clf.predict_proba(X_scaled)[0]
+    result_pred = np.argmax(result_probs)
+    result_label = {0: '客胜', 1: '平局', 2: '主胜'}[result_pred]
+    result_prob = result_probs[result_pred]
+    goals_probs = reg.predict_proba(X_scaled)[0]
+    goals_pred = np.argmax(goals_probs)
+    goals_prob = goals_probs[goals_pred]
+    goals_label = str(goals_pred) if goals_pred < 5 else '5+'
+    return {
+        'result': result_label,
+        'result_prob': result_prob,
+        'goals': goals_label,
+        'goals_prob': goals_prob,
+        'probs': {'主胜': result_probs[2], '平局': result_probs[1], '客胜': result_probs[0]}
+    }
+
+# ---------- 回测函数 ----------
+def run_backtest(df, clf, reg, scaler, feature_cols):
+    df_test = df.copy()
+    df_test['shots_diff'] = df_test['home_team_shots'] - df_test['away_team_shots']
+    df_test['shots_on_target_diff'] = df_test['home_team_shots_on_target'] - df_test['away_team_shots_on_target']
+    df_test['corner_diff'] = df_test['home_team_corner_count'] - df_test['away_team_corner_count']
+    df_test['possession_diff'] = df_test['home_team_possession'] - df_test['away_team_possession']
+    df_test['foul_diff'] = df_test['home_team_fouls'] - df_test['away_team_fouls']
+    df_test['yellow_diff'] = df_test['home_team_yellow_cards'] - df_test['away_team_yellow_cards']
+    df_test['xG_diff'] = df_test['Home Team Pre-Match xG'] - df_test['Away Team Pre-Match xG']
+    
+    X_test = df_test[feature_cols].fillna(0)
+    X_scaled = scaler.transform(X_test)
+    
+    result_preds = clf.predict(X_scaled)
+    result_probs = clf.predict_proba(X_scaled)
+    goals_preds = reg.predict(X_scaled)
+    
+    real_results = np.where(df_test['home_team_goal_count'] > df_test['away_team_goal_count'], 2,
+                            np.where(df_test['home_team_goal_count'] == df_test['away_team_goal_count'], 1, 0))
+    real_goals = np.clip(df_test['home_team_goal_count'] + df_test['away_team_goal_count'], 0, 5)
+    real_goals_label = real_goals.apply(lambda x: str(x) if x < 5 else '5+')
+    
+    result_label_map = {0: '客胜', 1: '平局', 2: '主胜'}
+    pred_result_label = [result_label_map[x] for x in result_preds]
+    real_result_label = [result_label_map[x] for x in real_results]
+    
+    goals_label_map = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5+'}
+    pred_goals_label = [goals_label_map[x] for x in goals_preds]
+    
+    # 简单比分预测
+    predicted_scores = []
+    for i, row in df_test.iterrows():
+        if pred_result_label[i] == '主胜':
+            g = int(pred_goals_label[i]) if pred_goals_label[i] != '5+' else 4
+            score = f"{g}:0" if g > 0 else "1:0"
+        elif pred_result_label[i] == '客胜':
+            g = int(pred_goals_label[i]) if pred_goals_label[i] != '5+' else 4
+            score = f"0:{g}" if g > 0 else "0:1"
+        else:
+            g = int(pred_goals_label[i]) if pred_goals_label[i] != '5+' else 4
+            score = f"{g//2}:{g - g//2}"
+        predicted_scores.append(score)
+    real_scores = df_test['home_team_goal_count'].astype(str) + ':' + df_test['away_team_goal_count'].astype(str)
+    
+    # 战意推导
+    game_weeks = df_test['Game Week'].fillna('KO').astype(str)
+    stage = []
+    for i, gw in enumerate(game_weeks):
+        if gw in ['1','2','3']:
+            if gw == '1':
+                stage.append('小组赛（第1轮·试探）')
+            elif gw == '2':
+                stage.append('小组赛（第2轮·关键战）')
+            else:
+                stage.append('小组赛（第3轮·生死战）')
+        else:
+            if 'Jul 15' in df_test.iloc[i]['date_GMT'] or 'Dec 18' in df_test.iloc[i]['date_GMT']:
+                stage.append('决赛')
+            else:
+                stage.append('淘汰赛')
+    
+    results_df = pd.DataFrame({
+        '主队': df_test['home_team_name'],
+        '客队': df_test['away_team_name'],
+        '真实比分': real_scores,
+        '预测比分': predicted_scores,
+        '真实结果': real_result_label,
+        '预测结果': pred_result_label,
+        '结果正确': np.array(real_result_label) == np.array(pred_result_label),
+        '真实总进球': real_goals_label,
+        '预测总进球': pred_goals_label,
+        '进球正确': np.array(real_goals_label) == np.array(pred_goals_label),
+        '战意': stage,
+        '主胜概率': [f"{p[2]:.1%}" for p in result_probs],
+        '平局概率': [f"{p[1]:.1%}" for p in result_probs],
+        '客胜概率': [f"{p[0]:.1%}" for p in result_probs]
+    })
+    
+    total = len(results_df)
+    result_acc = results_df['结果正确'].mean()
+    goals_acc = results_df['进球正确'].mean()
+    score_acc = (results_df['真实比分'] == results_df['预测比分']).mean()
+    
+    stage_stats = results_df.groupby('战意').agg(
+        准确率=('结果正确', 'mean'),
+        进球准确率=('进球正确', 'mean'),
+        场次=('结果正确', 'count')
+    ).reset_index()
+    
+    cm = confusion_matrix(results_df['真实结果'], results_df['预测结果'], labels=['客胜','平局','主胜'])
+    return results_df, {
+        '总准确率': result_acc,
+        '总进球准确率': goals_acc,
+        '比分准确率': score_acc,
+        '总场次': total,
+        '阶段统计': stage_stats,
+        '混淆矩阵': cm,
+        '混淆矩阵标签': ['客胜','平局','主胜']
+    }
+
+# ---------- UI主体 ----------
 st.markdown("""
 <style>
     .main { background-color: #f0f2f6; }
@@ -681,14 +869,23 @@ st.markdown("""
     .step-number { font-size: 20px; font-weight: bold; color: #f1c40f; }
     .step-primary { font-size: 22px; font-weight: bold; color: #2ecc71; }
     .step-secondary { font-size: 18px; color: #f39c12; }
+    .ml-pred { background-color: #e8f5e9; padding: 10px; border-radius: 8px; border-left: 5px solid #4caf50; margin: 10px 0; }
 </style>
 """, unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 全自动版")
-st.caption("输入球队名称自动匹配数据，赔率/让球手动输入")
+st.title("⚽ V6.0 足球预测 · 完整版 (含回测)")
+st.caption("内置32强数据 + 2018/2022机器学习 + 易经占卜 + 杂占 + 回测")
 
-# ---------- 输入区 ----------
+# 训练模型（后台）
+with st.spinner("正在训练机器学习模型（基于历史数据）..."):
+    clf, reg, scaler, feature_cols = train_models()
+if clf is not None:
+    st.success("✅ 机器学习模型训练完成！")
+else:
+    st.info("ℹ️ 未加载历史数据，仅使用传统方法预测。")
+
+# ---------- 单场预测输入 ----------
 with st.expander("📋 输入比赛信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
@@ -698,7 +895,6 @@ with st.expander("📋 输入比赛信息", expanded=True):
         st.subheader("客队")
         away = st.text_input("请输入球队名", placeholder="请输入球队名", key="away")
 
-    # 比赛时间和赔率
     match_date = st.date_input("比赛日期", value=datetime.date.today())
     match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
     match_time = datetime.datetime.combine(match_date, match_time_sel)
@@ -719,14 +915,12 @@ with st.expander("📋 输入比赛信息", expanded=True):
             index=2,
             key="handicap"
         )
-        st.caption(f"当前：{'主队让' + str(handicap_num) + '球' if handicap_num > 0 else '主队受让' + str(-handicap_num) + '球' if handicap_num < 0 else '平手'}")
         odds_hc_h = st.number_input("让胜赔率", value=3.5, step=0.1, min_value=1.0, key="hc_h")
         odds_hc_d = st.number_input("让平赔率", value=3.4, step=0.1, min_value=1.0, key="hc_d")
         odds_hc_a = st.number_input("让负赔率", value=2.0, step=0.1, min_value=1.0, key="hc_a")
     with col_odds[2]:
         st.caption("总进球/比分（已内嵌）")
 
-# ---------- 补丁和比赛性质 ----------
 with st.expander("🔧 补丁设置 & 比赛性质", expanded=False):
     col_p1, col_p2 = st.columns(2)
     with col_p1:
@@ -744,7 +938,6 @@ if st.button("🔮 开始推演", use_container_width=True):
     if home not in TEAM_DATA or away not in TEAM_DATA:
         st.error("❌ 输入的球队不在32强数据池中，请检查名称是否正确（如：巴西、日本）")
     else:
-        # 自动获取数据
         home_elo = TEAM_DATA[home]["elo"]
         home_xg = TEAM_DATA[home]["xg"]
         home_form = TEAM_DATA[home]["form"]
@@ -752,8 +945,8 @@ if st.button("🔮 开始推演", use_container_width=True):
         away_xg = TEAM_DATA[away]["xg"]
         away_form = TEAM_DATA[away]["form"]
 
-        st.success(f"✅ 主队 {home}：ELO={home_elo}，xG={home_xg}，胜率={home_form}")
-        st.success(f"✅ 客队 {away}：ELO={away_elo}，xG={away_xg}，胜率={away_form}")
+        st.success(f"✅ 主队 {home}：ELO={home_elo}，xG={home_xg}，胜率={home_form}，小组进球={TEAM_DATA[home]['group_goals']}")
+        st.success(f"✅ 客队 {away}：ELO={away_elo}，xG={away_xg}，胜率={away_form}，小组进球={TEAM_DATA[away]['group_goals']}")
 
         match_type_map = {
             "常规": "general", "淘汰赛": "knockout", "决赛": "final",
@@ -768,42 +961,50 @@ if st.button("🔮 开始推演", use_container_width=True):
             "odds_up": odds_up,
         }
 
-        # ========== 卦象分析 ==========
+        # 机器学习预测
+        if clf is not None:
+            st.divider()
+            st.markdown("## 🤖 机器学习预测")
+            home_stats = {'shots':12,'shots_on_target':5,'corners':6,'possession':50,'fouls':12,'yellow_cards':2,'xg':home_xg}
+            away_stats = {'shots':12,'shots_on_target':5,'corners':6,'possession':50,'fouls':12,'yellow_cards':2,'xg':away_xg}
+            ml_pred = predict_match(clf, reg, scaler, feature_cols, home, away, home_stats, away_stats)
+            if ml_pred:
+                st.markdown(f"""
+                <div class="ml-pred">
+                    <b>预测结果：</b> {ml_pred['result']}（概率 {ml_pred['result_prob']:.1%}）<br>
+                    <b>总进球：</b> {ml_pred['goals']}（概率 {ml_pred['goals_prob']:.1%}）<br>
+                    <b>详细概率：</b> 主胜 {ml_pred['probs']['主胜']:.1%}，平局 {ml_pred['probs']['平局']:.1%}，客胜 {ml_pred['probs']['客胜']:.1%}
+                </div>
+                """, unsafe_allow_html=True)
+
+        # 卦象分析
         st.divider()
-        st.markdown("## 🔮 第一阶段：卦象分析（笔画起卦）")
-        
+        st.markdown("## 🔮 第一阶段：卦象分析")
         gua_analysis = full_gua_analysis(home, away, mt_key)
         gua_info = gua_analysis["gua_info"]
         yao_details = gua_analysis["yao_details"]
         bing_yao = gua_analysis["bing_yao"]
-
         st.caption(f"起卦依据：主队“{home}”笔画数 {gua_info['home_strokes']}，客队“{away}”笔画数 {gua_info['away_strokes']}，总笔画 {gua_info['total_strokes']}，动爻 {gua_info['moving_yao']}")
-
         col_g1, col_g2, col_g3 = st.columns(3)
         col_g1.metric("本卦", f"{gua_info['base'][0]}{gua_info['base'][1]}（{gua_info['base_name']}）")
         col_g2.metric("变卦", f"{gua_info['change'][0]}{gua_info['change'][1]}（{gua_info['change_name']}）")
         col_g3.metric("互卦", f"{gua_info['inter'][0]}{gua_info['inter'][1]}（{gua_info['inter_name']}）")
-
         st.write(f"**体用生克**：{gua_info['ti_yong']}  （体卦{gua_info['body']}五行{gua_info['body_wuxing']}，用卦{gua_info['use']}五行{gua_info['use_wuxing']}）")
         st.write(f"**世应**：世爻在{LIUYAO_WEI[gua_info['shi_yao']]}（主队），应爻在{LIUYAO_WEI[gua_info['ying_yao']]}（客队）")
-
         base_key = gua_info["base_key"]
         if base_key in GUA_DICT:
             g = GUA_DICT[base_key]
             st.markdown(f"**📖 本卦【{g['name']}】卦辞**：{g['gua_ci']}")
             st.markdown(f"**象辞**：{g['xiang_ci']}")
-
         st.write("**💊 病药体系**：" + bing_yao['病药'])
         st.write(f"用神：{bing_yao['用神']} | 忌神：{bing_yao['忌神']} | 元神：{bing_yao['元神']} | 仇神：{bing_yao['仇神']}")
 
-        # ========== 古代杂占 ==========
+        # 古代杂占
         st.divider()
         st.markdown("## 📜 第二阶段：古代杂占")
-        
         shichen = get_shichen_from_time(match_time)
         shichen_time = ['23-1','1-3','3-5','5-7','7-9','9-11','11-13','13-15','15-17','17-19','19-21','21-23']
         st.write(f"**比赛时辰**：{shichen}时（{shichen_time[SHICHEN.index(shichen)]}）")
-        
         col_z1, col_z2 = st.columns(2)
         with col_z1:
             st.markdown(f"**面热**：{MIAN_RE[shichen]}")
@@ -820,14 +1021,11 @@ if st.button("🔮 开始推演", use_container_width=True):
             st.markdown(f"**心惊**：{XIN_JING[shichen]}")
             st.markdown(f"**鹊噪**：{QUE_ZAO[shichen]}")
 
-        # ========== 量化计算 ==========
+        # 量化计算
         st.divider()
         st.markdown("## 📊 第三阶段：量化计算")
-
         lam_h, lam_a = compute_lam(home_elo, away_elo, home_xg, away_xg, home_form, away_form, patches, mt_key)
-        home_prob = 0
-        draw_prob = 0
-        away_prob = 0
+        home_prob = 0; draw_prob = 0; away_prob = 0
         for h in range(0, 5):
             for a in range(0, 5):
                 prob = poisson_prob(lam_h, h) * poisson_prob(lam_a, a)
@@ -836,17 +1034,15 @@ if st.button("🔮 开始推演", use_container_width=True):
                 else: away_prob += prob
         st.write(f"**λ主**：{lam_h:.2f}，**λ客**：{lam_a:.2f}")
         st.write(f"**主胜概率**：{home_prob:.1%} | **平局概率**：{draw_prob:.1%} | **客胜概率**：{away_prob:.1%}")
-
         if odds_h > 0 and odds_d > 0 and odds_a > 0:
             ev_h = (home_prob * odds_h) - 1
             ev_d = (draw_prob * odds_d) - 1
             ev_a = (away_prob * odds_a) - 1
             st.caption(f"主胜EV：{ev_h:.2f} | 平局EV：{ev_d:.2f} | 客胜EV：{ev_a:.2f}")
 
-        # ========== 四层推演 ==========
+        # 四层推演
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
-
         result = four_step_predict(
             home, away, mt_key,
             home_elo, away_elo,
@@ -855,7 +1051,6 @@ if st.button("🔮 开始推演", use_container_width=True):
             handicap_num,
             patches
         )
-
         if handicap_num > 0:
             handicap_desc = f"主队-{handicap_num}（主队让{handicap_num}球）"
         elif handicap_num < 0:
@@ -888,7 +1083,6 @@ if st.button("🔮 开始推演", use_container_width=True):
         </div>
         """, unsafe_allow_html=True)
 
-        # 补丁状态
         st.caption("补丁状态：")
         if home_rotation >= 4 or away_rotation >= 4:
             st.caption("✅ 补丁①（轮换）触发")
@@ -899,7 +1093,6 @@ if st.button("🔮 开始推演", use_container_width=True):
         if home_xg >= 2.0 and away_xg <= 1.0:
             st.caption("✅ 补丁⑤（屠杀局）触发")
 
-        # ========== 六爻逐爻详解 ==========
         with st.expander("🔎 六爻逐爻详解（点击展开）", expanded=True):
             for i, yao in enumerate(yao_details):
                 st.markdown(f"**{yao['position']}**  (爻位：{yao['gong']})")
@@ -908,4 +1101,45 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown("---")
 
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 全自动版")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 完整数据版 + 机器学习增强")
+
+# ---------- 回测模块 ----------
+st.divider()
+st.markdown("## 📊 回测历史数据（2018+2022）")
+if st.button("📊 执行回测", use_container_width=True):
+    files = [
+        "international-fifa-world-cup-2018-russia-matches-2018-to-2018-stats.csv",
+        "international-fifa-world-cup-2022-qatar-matches-2022-to-2022-stats.csv"
+    ]
+    dfs = []
+    for f in files:
+        if os.path.exists(f):
+            df = pd.read_csv(f)
+            dfs.append(df)
+    if not dfs:
+        st.error("未找到CSV文件，请将数据文件放在应用目录下。")
+    else:
+        df_all = pd.concat(dfs, ignore_index=True)
+        if clf is None:
+            st.warning("模型未训练，正在重新训练...")
+            clf, reg, scaler, feature_cols = train_models()
+            if clf is None:
+                st.error("训练失败，无法回测。")
+                st.stop()
+        with st.spinner("回测中，请稍候..."):
+            results_df, stats = run_backtest(df_all, clf, reg, scaler, feature_cols)
+        st.success("回测完成！")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("总场次", stats['总场次'])
+        col2.metric("结果准确率", f"{stats['总准确率']:.1%}")
+        col3.metric("总进球准确率", f"{stats['总进球准确率']:.1%}")
+        col4.metric("比分准确率", f"{stats['比分准确率']:.1%}")
+        st.subheader("分阶段准确率")
+        st.dataframe(stats['阶段统计'].style.format({'准确率':'{:.1%}', '进球准确率':'{:.1%}'}))
+        st.subheader("混淆矩阵")
+        cm_df = pd.DataFrame(stats['混淆矩阵'], index=stats['混淆矩阵标签'], columns=stats['混淆矩阵标签'])
+        st.dataframe(cm_df)
+        with st.expander("查看每场比赛详细预测对比", expanded=False):
+            st.dataframe(results_df)
+        csv = results_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 下载回测结果CSV", data=csv, file_name="backtest_results.csv", mime="text/csv")
