@@ -829,6 +829,67 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
         if odds_h > 0 and odds_d > 0 and odds_a > 0:
             st.caption(f"主胜EV：{(hp * odds_h) - 1:.2f} | 平局EV：{(dp * odds_d) - 1:.2f} | 客胜EV：{(ap * odds_a) - 1:.2f}")
+            # ---------- 泊松分布详细分析（新增） ----------
+st.markdown("### 📈 泊松分布明细")
+
+# 计算最常见比分及概率（0~4球）
+score_probs = {}
+for h in range(5):
+    for a in range(5):
+        prob = poisson_prob(lh, h) * poisson_prob(la, a)
+        score_probs[f"{h}-{a}"] = prob
+
+# 排序取前5
+sorted_scores = sorted(score_probs.items(), key=lambda x: x[1], reverse=True)[:5]
+
+st.write(f"**预期进球**：主队 {lh:.2f}，客队 {la:.2f}")
+st.write("**最可能出现的比分（前5）**：")
+for score, prob in sorted_scores:
+    st.write(f"  - {score}：{prob:.1%}")
+
+# 总进球数概率
+goal_probs = {}
+for total in range(9):  # 0~8+
+    prob = 0
+    for h in range(max(0, total-4), min(4, total)+1):
+        a = total - h
+        if 0 <= a <= 4:
+            prob += poisson_prob(lh, h) * poisson_prob(la, a)
+    goal_probs[total] = prob
+# 合并5+球
+goal_probs_agg = {}
+for t, p in goal_probs.items():
+    if t <= 4:
+        goal_probs_agg[str(t)] = p
+    else:
+        goal_probs_agg["5+"] = goal_probs_agg.get("5+", 0) + p
+
+st.write("**总进球数概率分布**：")
+for g, p in sorted(goal_probs_agg.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
+    st.write(f"  - {g} 球：{p:.1%}")
+
+# ---------- 凯利公式计算（新增） ----------
+st.markdown("### 💰 凯利公式投注建议")
+st.caption("凯利值 = (赔率 × 概率 - 1) / (赔率 - 1)，正值表示有投注价值，越大越值得。")
+
+if odds_h > 0 and odds_d > 0 and odds_a > 0:
+    kelly_h = (odds_h * hp - 1) / (odds_h - 1) if odds_h > 1 else 0
+    kelly_d = (odds_d * dp - 1) / (odds_d - 1) if odds_d > 1 else 0
+    kelly_a = (odds_a * ap - 1) / (odds_a - 1) if odds_a > 1 else 0
+    
+    st.write(f"**主胜**：凯利值 = {kelly_h:.3f}（{'✅ 有投注价值' if kelly_h > 0 else '❌ 不建议'}）")
+    st.write(f"**平局**：凯利值 = {kelly_d:.3f}（{'✅ 有投注价值' if kelly_d > 0 else '❌ 不建议'}）")
+    st.write(f"**客胜**：凯利值 = {kelly_a:.3f}（{'✅ 有投注价值' if kelly_a > 0 else '❌ 不建议'}）")
+    
+    # 最佳投注推荐
+    max_kelly = max(kelly_h, kelly_d, kelly_a)
+    if max_kelly > 0:
+        best_bet = ["主胜", "平局", "客胜"][[kelly_h, kelly_d, kelly_a].index(max_kelly)]
+        st.success(f"🏆 最佳投注选项：**{best_bet}**（凯利值 {max_kelly:.3f}）")
+    else:
+        st.warning("⚠️ 所有选项的凯利值均为负或零，建议观望或跳过。")
+else:
+    st.info("请先输入有效的胜平负赔率，凯利公式才能计算。")
         st.divider()
         st.markdown("## 🎯 第四阶段：四层推演结论")
         res = four_step_predict(home, away, mtk, he, ae, hx, ax, hf, af, hc, patches)
