@@ -2,7 +2,6 @@
 import sys
 import os
 
-# 打包后正确找到文件路径
 if getattr(sys, 'frozen', False):
     BASE_DIR = sys._MEIPASS
 else:
@@ -16,14 +15,14 @@ import math
 import datetime
 import re
 import difflib
-import io
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import xgboost as xgb
 
-st.set_page_config(page_title="V6.0 足球预测 · 48队完整版", page_icon="⚽", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="V6.0 足球预测 · 精简核心版", page_icon="⚽", layout="centered", initial_sidebar_state="collapsed")
 
+# ---------- 预测历史 ----------
 HISTORY_FILE = os.path.join(BASE_DIR, "predict_history.csv")
 
 def load_history():
@@ -37,6 +36,7 @@ def save_history(history):
 if 'predict_history' not in st.session_state:
     st.session_state.predict_history = load_history()
 
+# ---------- 48队数据 ----------
 @st.cache_data
 def load_team_data():
     return {
@@ -108,6 +108,7 @@ def fuzzy_match(name, choices, cutoff=0.6):
         return choices[idx]
     return None
 
+# ---------- 易经核心 ----------
 BAGUA_WUXING = {"乾": "金", "兑": "金", "离": "火", "震": "木", "巽": "木", "坎": "水", "艮": "土", "坤": "土"}
 BAGUA_LEIXIANG = {"乾": "天", "兑": "泽", "离": "火", "震": "雷", "巽": "风", "坎": "水", "艮": "山", "坤": "地"}
 LIUYAO_WEI = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
@@ -117,69 +118,69 @@ SHICHEN = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉",
 
 GUA_DICT = {
     "乾乾": {"name": "乾为天", "gua_ci": "元亨利贞。", "xiang_ci": "天行健，君子以自强不息。"},
-    "坤坤": {"name": "坤为地", "gua_ci": "元亨，利牝马之贞。君子有攸往，先迷后得主，利西南得朋，东北丧朋，安贞吉。", "xiang_ci": "地势坤，君子以厚德载物。"},
+    "坤坤": {"name": "坤为地", "gua_ci": "元亨，利牝马之贞。", "xiang_ci": "地势坤，君子以厚德载物。"},
     "坎震": {"name": "水雷屯", "gua_ci": "元亨利贞。勿用有攸往，利建侯。", "xiang_ci": "云雷屯，君子以经纶。"},
-    "艮坎": {"name": "山水蒙", "gua_ci": "亨。匪我求童蒙，童蒙求我。初筮告，再三渎，渎则不告。利贞。", "xiang_ci": "山下出泉，蒙，君子以果行育德。"},
+    "艮坎": {"name": "山水蒙", "gua_ci": "亨。匪我求童蒙，童蒙求我。", "xiang_ci": "山下出泉，蒙，君子以果行育德。"},
     "坎乾": {"name": "水天需", "gua_ci": "有孚，光亨贞吉，利涉大川。", "xiang_ci": "云上于天，需，君子以饮食宴乐。"},
-    "乾坎": {"name": "天水讼", "gua_ci": "有孚，窒惕，中吉，终凶。利见大人，不利涉大川。", "xiang_ci": "天与水违行，讼，君子以作事谋始。"},
+    "乾坎": {"name": "天水讼", "gua_ci": "有孚，窒惕，中吉，终凶。", "xiang_ci": "天与水违行，讼，君子以作事谋始。"},
     "坤坎": {"name": "地水师", "gua_ci": "贞，丈人吉，无咎。", "xiang_ci": "地中有水，师，君子以容民畜众。"},
-    "坎坤": {"name": "水地比", "gua_ci": "吉，原筮，元永贞，无咎。不宁方来，后夫凶。", "xiang_ci": "地上有水，比，先王以建万国，亲诸侯。"},
+    "坎坤": {"name": "水地比", "gua_ci": "吉，原筮，元永贞，无咎。", "xiang_ci": "地上有水，比，先王以建万国。"},
     "巽乾": {"name": "风天小畜", "gua_ci": "亨，密云不雨，自我西郊。", "xiang_ci": "风行天上，小畜，君子以懿文德。"},
-    "乾兑": {"name": "天泽履", "gua_ci": "履虎尾，不咥人，亨。", "xiang_ci": "上天下泽，履，君子以辩上下，定民志。"},
-    "坤乾": {"name": "地天泰", "gua_ci": "小往大来，吉亨。", "xiang_ci": "天地交，泰，后以财成天地之道，辅相天地之宜，以左右民。"},
-    "乾坤": {"name": "天地否", "gua_ci": "之匪人，不利君子贞，大往小来。", "xiang_ci": "天地不交，否，君子以俭德辟难，不可荣以禄。"},
-    "乾离": {"name": "天火同人", "gua_ci": "于野，亨，利涉大川，利君子贞。", "xiang_ci": "天与火，同人，君子以类族辨物。"},
-    "离乾": {"name": "火天大有", "gua_ci": "元亨。", "xiang_ci": "火在天上，大有，君子以遏恶扬善，顺天休命。"},
-    "坤艮": {"name": "地山谦", "gua_ci": "亨，君子有终。", "xiang_ci": "地中有山，谦，君子以裒多益寡，称物平施。"},
-    "震坤": {"name": "雷地豫", "gua_ci": "利建侯行师。", "xiang_ci": "雷出地奋，豫，先王以作乐崇德，殷荐之上帝，以配祖考。"},
+    "乾兑": {"name": "天泽履", "gua_ci": "履虎尾，不咥人，亨。", "xiang_ci": "上天下泽，履，君子以辩上下。"},
+    "坤乾": {"name": "地天泰", "gua_ci": "小往大来，吉亨。", "xiang_ci": "天地交，泰，后以财成天地之道。"},
+    "乾坤": {"name": "天地否", "gua_ci": "之匪人，不利君子贞。", "xiang_ci": "天地不交，否，君子以俭德辟难。"},
+    "乾离": {"name": "天火同人", "gua_ci": "于野，亨，利涉大川。", "xiang_ci": "天与火，同人，君子以类族辨物。"},
+    "离乾": {"name": "火天大有", "gua_ci": "元亨。", "xiang_ci": "火在天上，大有，君子以遏恶扬善。"},
+    "坤艮": {"name": "地山谦", "gua_ci": "亨，君子有终。", "xiang_ci": "地中有山，谦，君子以裒多益寡。"},
+    "震坤": {"name": "雷地豫", "gua_ci": "利建侯行师。", "xiang_ci": "雷出地奋，豫，先王以作乐崇德。"},
     "兑震": {"name": "泽雷随", "gua_ci": "元亨利贞，无咎。", "xiang_ci": "泽中有雷，随，君子以向晦入宴息。"},
     "艮巽": {"name": "山风蛊", "gua_ci": "元亨，利涉大川。先甲三日，后甲三日。", "xiang_ci": "山下有风，蛊，君子以振民育德。"},
-    "坤兑": {"name": "地泽临", "gua_ci": "元亨，利贞。至于八月有凶。", "xiang_ci": "泽上有地，临，君子以教思无穷，容保民无疆。"},
-    "巽坤": {"name": "风地观", "gua_ci": "盥而不荐，有孚颙若。", "xiang_ci": "风行地上，观，先王以省方观民设教。"},
+    "坤兑": {"name": "地泽临", "gua_ci": "元亨，利贞。", "xiang_ci": "泽上有地，临，君子以教思无穷。"},
+    "巽坤": {"name": "风地观", "gua_ci": "盥而不荐，有孚颙若。", "xiang_ci": "风行地上，观，先王以省方观民。"},
     "离震": {"name": "火雷噬嗑", "gua_ci": "亨，利用狱。", "xiang_ci": "雷电，噬嗑，先王以明罚敕法。"},
-    "艮离": {"name": "山火贲", "gua_ci": "亨，小利有攸往。", "xiang_ci": "山下有火，贲，君子以明庶政，无敢折狱。"},
+    "艮离": {"name": "山火贲", "gua_ci": "亨，小利有攸往。", "xiang_ci": "山下有火，贲，君子以明庶政。"},
     "艮坤": {"name": "山地剥", "gua_ci": "不利有攸往。", "xiang_ci": "山附于地，剥，上以厚下安宅。"},
-    "坤震": {"name": "地雷复", "gua_ci": "亨。出入无疾，朋来无咎。反复其道，七日来复，利有攸往。", "xiang_ci": "雷在地中，复，先王以至日闭关，商旅不行，后不省方。"},
-    "乾震": {"name": "天雷无妄", "gua_ci": "元亨，利贞。其匪正有眚，不利有攸往。", "xiang_ci": "天下雷行，物与无妄，先王以茂对时育万物。"},
-    "艮乾": {"name": "山天大畜", "gua_ci": "利贞，不家食吉，利涉大川。", "xiang_ci": "天在山中，大畜，君子以多识前言往行，以畜其德。"},
-    "艮震": {"name": "山雷颐", "gua_ci": "贞吉，观颐，自求口实。", "xiang_ci": "山下有雷，颐，君子以慎言语，节饮食。"},
-    "兑巽": {"name": "泽风大过", "gua_ci": "栋桡，利有攸往，亨。", "xiang_ci": "泽灭木，大过，君子以独立不惧，遁世无闷。"},
-    "坎坎": {"name": "坎为水", "gua_ci": "习坎，有孚，维心亨，行有尚。", "xiang_ci": "水洊至，习坎，君子以常德行，习教事。"},
+    "坤震": {"name": "地雷复", "gua_ci": "亨。出入无疾，反复其道，七日来复。", "xiang_ci": "雷在地中，复，先王以至日闭关。"},
+    "乾震": {"name": "天雷无妄", "gua_ci": "元亨，利贞。其匪正有眚。", "xiang_ci": "天下雷行，物与无妄。"},
+    "艮乾": {"name": "山天大畜", "gua_ci": "利贞，不家食吉，利涉大川。", "xiang_ci": "天在山中，大畜，君子以多识。"},
+    "艮震": {"name": "山雷颐", "gua_ci": "贞吉，观颐，自求口实。", "xiang_ci": "山下有雷，颐，君子以慎言语。"},
+    "兑巽": {"name": "泽风大过", "gua_ci": "栋桡，利有攸往，亨。", "xiang_ci": "泽灭木，大过，君子以独立不惧。"},
+    "坎坎": {"name": "坎为水", "gua_ci": "习坎，有孚，维心亨。", "xiang_ci": "水洊至，习坎，君子以常德行。"},
     "离离": {"name": "离为火", "gua_ci": "利贞，亨。畜牝牛，吉。", "xiang_ci": "明两作，离，大人以继明照于四方。"},
     "兑艮": {"name": "泽山咸", "gua_ci": "亨，利贞，取女吉。", "xiang_ci": "山上有泽，咸，君子以虚受人。"},
     "震巽": {"name": "雷风恒", "gua_ci": "亨，无咎，利贞，利有攸往。", "xiang_ci": "雷风，恒，君子以立不易方。"},
-    "乾艮": {"name": "天山遁", "gua_ci": "亨，小利贞。", "xiang_ci": "天下有山，遁，君子以远小人，不恶而严。"},
+    "乾艮": {"name": "天山遁", "gua_ci": "亨，小利贞。", "xiang_ci": "天下有山，遁，君子以远小人。"},
     "震乾": {"name": "雷天大壮", "gua_ci": "利贞。", "xiang_ci": "雷在天上，大壮，君子以非礼弗履。"},
     "离坤": {"name": "火地晋", "gua_ci": "康侯用锡马蕃庶，昼日三接。", "xiang_ci": "明出地上，晋，君子以自昭明德。"},
-    "坤离": {"name": "地火明夷", "gua_ci": "利艰贞。", "xiang_ci": "明入地中，明夷，君子以莅众，用晦而明。"},
-    "巽离": {"name": "风火家人", "gua_ci": "利女贞。", "xiang_ci": "风自火出，家人，君子以言有物，而行有恒。"},
+    "坤离": {"name": "地火明夷", "gua_ci": "利艰贞。", "xiang_ci": "明入地中，明夷，君子以莅众。"},
+    "巽离": {"name": "风火家人", "gua_ci": "利女贞。", "xiang_ci": "风自火出，家人，君子以言有物。"},
     "离兑": {"name": "火泽睽", "gua_ci": "小事吉。", "xiang_ci": "上火下泽，睽，君子以同而异。"},
-    "坎艮": {"name": "水山蹇", "gua_ci": "利西南，不利东北，利见大人，贞吉。", "xiang_ci": "山上有水，蹇，君子以反身修德。"},
-    "震坎": {"name": "雷水解", "gua_ci": "利西南，无所往，其来复吉，有攸往，夙吉。", "xiang_ci": "雷雨作，解，君子以赦过宥罪。"},
-    "艮兑": {"name": "山泽损", "gua_ci": "有孚，元吉，无咎，可贞，利有攸往。曷之用，二簋可用享。", "xiang_ci": "山下有泽，损，君子以惩忿窒欲。"},
-    "巽震": {"name": "风雷益", "gua_ci": "利有攸往，利涉大川。", "xiang_ci": "风雷，益，君子以见善则迁，有过则改。"},
-    "兑乾": {"name": "泽天夬", "gua_ci": "扬于王庭，孚号有厉。告自邑，不利即戎，利有攸往。", "xiang_ci": "泽上于天，夬，君子以施禄及下，居德则忌。"},
+    "坎艮": {"name": "水山蹇", "gua_ci": "利西南，不利东北，利见大人。", "xiang_ci": "山上有水，蹇，君子以反身修德。"},
+    "震坎": {"name": "雷水解", "gua_ci": "利西南，无所往，其来复吉。", "xiang_ci": "雷雨作，解，君子以赦过宥罪。"},
+    "艮兑": {"name": "山泽损", "gua_ci": "有孚，元吉，无咎，可贞。", "xiang_ci": "山下有泽，损，君子以惩忿窒欲。"},
+    "巽震": {"name": "风雷益", "gua_ci": "利有攸往，利涉大川。", "xiang_ci": "风雷，益，君子以见善则迁。"},
+    "兑乾": {"name": "泽天夬", "gua_ci": "扬于王庭，孚号有厉。", "xiang_ci": "泽上于天，夬，君子以施禄及下。"},
     "乾巽": {"name": "天风姤", "gua_ci": "女壮，勿用取女。", "xiang_ci": "天下有风，姤，后以施命诰四方。"},
-    "兑坤": {"name": "泽地萃", "gua_ci": "亨，王假有庙，利见大人，亨，利贞。用大牲吉，利有攸往。", "xiang_ci": "泽上于地，萃，君子以除戎器，戒不虞。"},
-    "坤巽": {"name": "地风升", "gua_ci": "元亨，用见大人，勿恤，南征吉。", "xiang_ci": "地中生木，升，君子以顺德，积小以高大。"},
-    "兑坎": {"name": "泽水困", "gua_ci": "亨，贞大人吉，无咎，有言不信。", "xiang_ci": "泽无水，困，君子以致命遂志。"},
-    "坎巽": {"name": "水风井", "gua_ci": "改邑不改井，无丧无得，往来井井。汔至亦未繘井，羸其瓶，凶。", "xiang_ci": "木上有水，井，君子以劳民劝相。"},
-    "兑离": {"name": "泽火革", "gua_ci": "已日乃孚，元亨，利贞，悔亡。", "xiang_ci": "泽中有火，革，君子以治历明时。"},
+    "兑坤": {"name": "泽地萃", "gua_ci": "亨，王假有庙，利见大人。", "xiang_ci": "泽上于地，萃，君子以除戎器。"},
+    "坤巽": {"name": "地风升", "gua_ci": "元亨，用见大人，勿恤，南征吉。", "xiang_ci": "地中生木，升，君子以顺德。"},
+    "兑坎": {"name": "泽水困", "gua_ci": "亨，贞大人吉，无咎。", "xiang_ci": "泽无水，困，君子以致命遂志。"},
+    "坎巽": {"name": "水风井", "gua_ci": "改邑不改井，无丧无得。", "xiang_ci": "木上有水，井，君子以劳民劝相。"},
+    "兑离": {"name": "泽火革", "gua_ci": "已日乃孚，元亨，利贞。", "xiang_ci": "泽中有火，革，君子以治历明时。"},
     "离巽": {"name": "火风鼎", "gua_ci": "元吉，亨。", "xiang_ci": "木上有火，鼎，君子以正位凝命。"},
-    "震震": {"name": "震为雷", "gua_ci": "亨，震来虩虩，笑言哑哑，震惊百里，不丧匕鬯。", "xiang_ci": "洊雷，震，君子以恐惧修省。"},
-    "艮艮": {"name": "艮为山", "gua_ci": "其背，不获其身，行其庭，不见其人，无咎。", "xiang_ci": "兼山，艮，君子以思不出其位。"},
+    "震震": {"name": "震为雷", "gua_ci": "亨，震来虩虩，笑言哑哑。", "xiang_ci": "洊雷，震，君子以恐惧修省。"},
+    "艮艮": {"name": "艮为山", "gua_ci": "其背，不获其身，行其庭，不见其人。", "xiang_ci": "兼山，艮，君子以思不出其位。"},
     "巽艮": {"name": "风山渐", "gua_ci": "女归吉，利贞。", "xiang_ci": "山上有木，渐，君子以居贤德善俗。"},
     "震兑": {"name": "雷泽归妹", "gua_ci": "征凶，无攸利。", "xiang_ci": "泽上有雷，归妹，君子以永终知敝。"},
     "震离": {"name": "雷火丰", "gua_ci": "亨，王假之，勿忧，宜日中。", "xiang_ci": "雷电皆至，丰，君子以折狱致刑。"},
-    "离艮": {"name": "火山旅", "gua_ci": "小亨，旅贞吉。", "xiang_ci": "山上有火，旅，君子以明慎用刑，而不留狱。"},
+    "离艮": {"name": "火山旅", "gua_ci": "小亨，旅贞吉。", "xiang_ci": "山上有火，旅，君子以明慎用刑。"},
     "巽巽": {"name": "巽为风", "gua_ci": "小亨，利有攸往，利见大人。", "xiang_ci": "随风，巽，君子以申命行事。"},
     "兑兑": {"name": "兑为泽", "gua_ci": "亨，利贞。", "xiang_ci": "丽泽，兑，君子以朋友讲习。"},
-    "巽坎": {"name": "风水涣", "gua_ci": "亨，王假有庙，利涉大川，利贞。", "xiang_ci": "风行水上，涣，先王以享于帝立庙。"},
-    "坎兑": {"name": "水泽节", "gua_ci": "亨，苦节不可贞。", "xiang_ci": "泽上有水，节，君子以制数度，议德行。"},
+    "巽坎": {"name": "风水涣", "gua_ci": "亨，王假有庙，利涉大川。", "xiang_ci": "风行水上，涣，先王以享于帝立庙。"},
+    "坎兑": {"name": "水泽节", "gua_ci": "亨，苦节不可贞。", "xiang_ci": "泽上有水，节，君子以制数度。"},
     "巽兑": {"name": "风泽中孚", "gua_ci": "豚鱼吉，利涉大川，利贞。", "xiang_ci": "泽上有风，中孚，君子以议狱缓死。"},
-    "震艮": {"name": "雷山小过", "gua_ci": "亨，利贞，可小事，不可大事。飞鸟遗之音，不宜上宜下，大吉。", "xiang_ci": "山上有雷，小过，君子以行过乎恭，丧过乎哀，用过乎俭。"},
-    "坎离": {"name": "水火既济", "gua_ci": "亨小，利贞，初吉，终乱。", "xiang_ci": "水在火上，既济，君子以思患而豫防之。"},
-    "离坎": {"name": "火水未济", "gua_ci": "亨，小狐汔济，濡其尾，无攸利。", "xiang_ci": "火在水上，未济，君子以慎辨物居方。"}
+    "震艮": {"name": "雷山小过", "gua_ci": "亨，利贞，可小事，不可大事。", "xiang_ci": "山上有雷，小过，君子以行过乎恭。"},
+    "坎离": {"name": "水火既济", "gua_ci": "亨小，利贞，初吉，终乱。", "xiang_ci": "水在火上，既济，君子以思患而豫防。"},
+    "离坎": {"name": "火水未济", "gua_ci": "亨，小狐汔济，濡其尾。", "xiang_ci": "火在水上，未济，君子以慎辨物居方。"}
 }
 
 MIAN_RE = {"子": "主喜庆事，主得财。", "丑": "主有烦恼、忧愁之事。", "寅": "主有客来，大吉。", "卯": "主有酒食及外人至。",
@@ -257,42 +258,32 @@ def count_strokes(name):
     return total
 
 def get_inter_gua(upper, lower):
-    gm = {"乾": [1, 1, 1], "兑": [0, 1, 1], "离": [1, 0, 1], "震": [0, 0, 1],
-          "巽": [1, 1, 0], "坎": [0, 1, 0], "艮": [1, 0, 0], "坤": [0, 0, 0]}
-    ub = gm[upper]
-    lb = gm[lower]
+    gm = {"乾": [1,1,1], "兑": [0,1,1], "离": [1,0,1], "震": [0,0,1],
+          "巽": [1,1,0], "坎": [0,1,0], "艮": [1,0,0], "坤": [0,0,0]}
+    ub = gm[upper]; lb = gm[lower]
     full = lb + ub
-    li = full[1:4]
-    ui = full[2:5]
+    li = full[1:4]; ui = full[2:5]
     rev = {tuple(v): k for k, v in gm.items()}
     return rev[tuple(ui)], rev[tuple(li)]
 
 def generate_gua_info(home, away):
     ch = re.sub(r'[^\u4e00-\u9fa5]', '', home)
     ca = re.sub(r'[^\u4e00-\u9fa5]', '', away)
-    hs = count_strokes(ch)
-    as_ = count_strokes(ca)
+    hs = count_strokes(ch); as_ = count_strokes(ca)
     ts = hs + as_
-    un = hs % 8
-    if un == 0:
-        un = 8
+    un = hs % 8; 
+    if un == 0: un = 8
     ln = as_ % 8
-    if ln == 0:
-        ln = 8
+    if ln == 0: ln = 8
     my = ts % 6
-    if my == 0:
-        my = 6
+    if my == 0: my = 6
     ntg = {1: "乾", 2: "兑", 3: "离", 4: "震", 5: "巽", 6: "坎", 7: "艮", 8: "坤"}
-    upper = ntg[un]
-    lower = ntg[ln]
+    upper = ntg[un]; lower = ntg[ln]
     rev = {"乾": "坤", "坤": "乾", "震": "巽", "巽": "震", "坎": "离", "离": "坎", "艮": "兑", "兑": "艮"}
-    cu = rev.get(upper, upper)
-    cl = rev.get(lower, lower)
+    cu = rev.get(upper, upper); cl = rev.get(lower, lower)
     iu, il = get_inter_gua(upper, lower)
-    body = upper
-    use = lower
-    bw = get_wuxing(body)
-    uw = get_wuxing(use)
+    body = upper; use = lower
+    bw = get_wuxing(body); uw = get_wuxing(use)
     if bw == uw:
         ty = "比和（平局相）"
     elif (bw == "木" and uw == "土") or (bw == "火" and uw == "金") or (bw == "土" and uw == "水") or (bw == "金" and uw == "木") or (bw == "水" and uw == "火"):
@@ -301,8 +292,7 @@ def generate_gua_info(home, away):
         ty = "用克体（客队制胜）"
     else:
         ty = "相生（平和）"
-    sy = my - 1
-    ey = (sy + 4) % 6
+    sy = my - 1; ey = (sy + 4) % 6
     return {"base": (upper, lower), "base_key": upper + lower, "base_name": f"{BAGUA_LEIXIANG[upper]}{BAGUA_LEIXIANG[lower]}",
             "change": (cu, cl), "change_name": f"{BAGUA_LEIXIANG[cu]}{BAGUA_LEIXIANG[cl]}",
             "inter": (iu, il), "inter_name": f"{BAGUA_LEIXIANG[iu]}{BAGUA_LEIXIANG[il]}",
@@ -383,14 +373,11 @@ def get_shichen_from_time(match_time):
     return SHICHEN[(hour + 1) // 2 % 12]
 
 def compute_lam(he, ae, hx, ax, patches, mt):
+    # patches 保留空字典，因为去掉了补丁设置，但内部仍可能调用，故留空
     ef = (he - ae) / 2000 * 0.4
     xf = (hx / (hx + ax + 0.01)) * 0.4
     lh = max(0.3, ef + xf + 0.5)
     la = max(0.3, -ef + (ax / (hx + ax + 0.01)) * 0.4 + 0.5)
-    if patches.get("home_rotation", 0) >= 4:
-        lh *= 0.5
-    if patches.get("away_rotation", 0) >= 4:
-        la *= 0.5
     if hx >= 2.0 and ax <= 1.0:
         if mt in ["final", "semi", "quarter", "round_16", "round_32"]:
             lh *= 1.5
@@ -405,123 +392,62 @@ def poisson_prob(l, g):
 def generate_dynamic_score(dp, gi, he, ae, hx, ax):
     ed = he - ae
     xd = hx - ax
-    if ed >= 200:
-        e = 3.0
-    elif ed >= 150:
-        e = 2.5
-    elif ed >= 100:
-        e = 2.0
-    elif ed >= 50:
-        e = 1.5
-    else:
-        e = 1.0
-    if xd >= 1.5:
-        e += 0.8
-    elif xd >= 1.0:
-        e += 0.5
-    elif xd >= 0.5:
-        e += 0.3
-    if xd <= -1.0:
-        e -= 0.5
-    elif xd <= -0.5:
-        e -= 0.3
-    e = round(e)
-    e = max(1, min(4, e))
+    if ed >= 200: e = 3.0
+    elif ed >= 150: e = 2.5
+    elif ed >= 100: e = 2.0
+    elif ed >= 50: e = 1.5
+    else: e = 1.0
+    if xd >= 1.5: e += 0.8
+    elif xd >= 1.0: e += 0.5
+    elif xd >= 0.5: e += 0.3
+    if xd <= -1.0: e -= 0.5
+    elif xd <= -0.5: e -= 0.3
+    e = round(e); e = max(1, min(4, e))
     if dp == "主胜":
         if e >= 3:
-            if gi >= 3:
-                return f"{e}:0" if e >= 3 else "3:0"
-            else:
-                return "2:0"
-        elif e >= 2:
-            return "2:0"
-        else:
-            return "1:0"
+            if gi >= 3: return f"{e}:0" if e >= 3 else "3:0"
+            else: return "2:0"
+        elif e >= 2: return "2:0"
+        else: return "1:0"
     elif dp == "客胜":
-        if e >= 2:
-            return f"0:{e}" if e >= 2 else "0:2"
-        else:
-            return "0:1"
+        if e >= 2: return f"0:{e}" if e >= 2 else "0:2"
+        else: return "0:1"
     else:
-        if gi >= 2:
-            return "1:1"
-        else:
-            return "0:0"
+        if gi >= 2: return "1:1"
+        else: return "0:0"
 
 def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
     ed = he - ae
     xs = hx + ax
-    if patches.get("draw_to_advance") == "home":
-        db = 0.15
-        xs *= 0.9
-    elif patches.get("draw_to_advance") == "away":
-        db = 0.15
-        xs *= 0.9
-    else:
-        db = 0.0
-    if patches.get("odds_up", False):
-        xs = max(0.5, xs - 0.5)
-    if mt == "group":
-        xs *= 1.0
-    elif mt == "round_32":
-        xs *= 0.98
-    elif mt == "round_16":
-        xs *= 0.95
-    elif mt == "quarter":
-        xs *= 0.92
-    elif mt == "semi":
-        xs *= 0.88
-    elif mt == "third":
-        xs *= 0.95
-    elif mt == "final":
-        xs *= 0.85
+    # 去掉补丁相关逻辑（保留空判断）
+    if mt == "group": xs *= 1.0
+    elif mt == "round_32": xs *= 0.98
+    elif mt == "round_16": xs *= 0.95
+    elif mt == "quarter": xs *= 0.92
+    elif mt == "semi": xs *= 0.88
+    elif mt == "third": xs *= 0.95
+    elif mt == "final": xs *= 0.85
 
     if abs(ed) > 150:
-        if ed > 0:
-            dp = "主胜"
-            ds = "平局"
-        else:
-            dp = "客胜"
-            ds = "平局"
+        if ed > 0: dp = "主胜"; ds = "平局"
+        else: dp = "客胜"; ds = "平局"
     elif abs(ed) >= 50:
-        if hx > ax:
-            dp = "主胜"
-            ds = "平局"
-        elif ax > hx:
-            dp = "客胜"
-            ds = "平局"
-        else:
-            dp = "平局"
-            ds = "主胜" if hx > ax else "客胜"
+        if hx > ax: dp = "主胜"; ds = "平局"
+        elif ax > hx: dp = "客胜"; ds = "平局"
+        else: dp = "平局"; ds = "主胜" if hx > ax else "客胜"
     else:
-        dp = "平局"
-        ds = "主胜" if hx > ax else "客胜"
-
-    if db > 0 and abs(hx - ax) < 0.3 and dp != "平局":
-        dp, ds = "平局", dp
+        dp = "平局"; ds = "主胜" if hx > ax else "客胜"
 
     if mt in ["final", "semi", "quarter", "round_16", "round_32"] and dp == "主胜" and abs(hx - ax) < 0.5:
         dp, ds = "平局", dp
 
-    if xs >= 3.5:
-        gp = "3"
-        gs = "4"
-    elif xs >= 2.5:
-        gp = "2"
-        gs = "3"
-    elif xs >= 1.5:
-        gp = "1"
-        gs = "2"
-    else:
-        gp = "0"
-        gs = "1"
-    if xs >= 4.0 and gp == "3":
-        gs = "4"
-    if xs >= 5.0 and gp == "4":
-        gs = "5"
-    if xs >= 6.5:
-        gp = "5"
-        gs = "7+"
+    if xs >= 3.5: gp = "3"; gs = "4"
+    elif xs >= 2.5: gp = "2"; gs = "3"
+    elif xs >= 1.5: gp = "1"; gs = "2"
+    else: gp = "0"; gs = "1"
+    if xs >= 4.0 and gp == "3": gs = "4"
+    if xs >= 5.0 and gp == "4": gs = "5"
+    if xs >= 6.5: gp = "5"; gs = "7+"
 
     gpi = int(gp) if gp.isdigit() else 0
     gsi = int(gs) if gs.isdigit() else 0
@@ -530,19 +456,16 @@ def four_step_predict(home, away, mt, he, ae, hx, ax, patches):
 
     def adj(s, d):
         hh, aa = map(int, s.split(':'))
-        if d == "主胜" and hh <= aa:
-            return "1:0" if aa == 0 else "2:1"
-        elif d == "客胜" and hh >= aa:
-            return "0:1" if aa == 1 else "0:2"
-        elif d == "平局" and hh != aa:
-            return "1:1"
+        if d == "主胜" and hh <= aa: return "1:0" if aa == 0 else "2:1"
+        elif d == "客胜" and hh >= aa: return "0:1" if aa == 1 else "0:2"
+        elif d == "平局" and hh != aa: return "1:1"
         return s
-
     ss = adj(ss, ds)
     return {"direction_primary": dp, "direction_secondary": ds,
             "goal_primary": str(sum(map(int, sp.split(':')))), "goal_secondary": str(sum(map(int, ss.split(':')))),
             "score_primary": sp, "score_secondary": ss, "lam_h": hx, "lam_a": ax}
 
+# ---------- 机器学习 ----------
 @st.cache_resource
 def train_models():
     files = [
@@ -554,53 +477,32 @@ def train_models():
         if os.path.exists(f):
             dfs.append(pd.read_csv(f))
     if not dfs:
-        st.warning("未找到CSV文件，回测功能将不可用")
         return None, None, None, None
     df_all = pd.concat(dfs, ignore_index=True)
     cmap = {}
     for col in df_all.columns:
         cl = col.lower().strip()
-        if 'home_team_name' in cl:
-            cmap['home_team_name'] = col
-        elif 'away_team_name' in cl:
-            cmap['away_team_name'] = col
-        elif 'home_team_goal_count' in cl:
-            cmap['home_team_goal_count'] = col
-        elif 'away_team_goal_count' in cl:
-            cmap['away_team_goal_count'] = col
-        elif 'home_team_shots' in cl and 'on_target' not in cl:
-            cmap['home_team_shots'] = col
-        elif 'away_team_shots' in cl and 'on_target' not in cl:
-            cmap['away_team_shots'] = col
-        elif 'home_team_shots_on_target' in cl:
-            cmap['home_team_shots_on_target'] = col
-        elif 'away_team_shots_on_target' in cl:
-            cmap['away_team_shots_on_target'] = col
-        elif 'home_team_corner_count' in cl:
-            cmap['home_team_corner_count'] = col
-        elif 'away_team_corner_count' in cl:
-            cmap['away_team_corner_count'] = col
-        elif 'home_team_possession' in cl:
-            cmap['home_team_possession'] = col
-        elif 'away_team_possession' in cl:
-            cmap['away_team_possession'] = col
-        elif 'home_team_fouls' in cl:
-            cmap['home_team_fouls'] = col
-        elif 'away_team_fouls' in cl:
-            cmap['away_team_fouls'] = col
-        elif 'home_team_yellow_cards' in cl:
-            cmap['home_team_yellow_cards'] = col
-        elif 'away_team_yellow_cards' in cl:
-            cmap['away_team_yellow_cards'] = col
-        elif 'home team pre-match xg' in cl:
-            cmap['Home Team Pre-Match xG'] = col
-        elif 'away team pre-match xg' in cl:
-            cmap['Away Team Pre-Match xG'] = col
+        if 'home_team_name' in cl: cmap['home_team_name'] = col
+        elif 'away_team_name' in cl: cmap['away_team_name'] = col
+        elif 'home_team_goal_count' in cl: cmap['home_team_goal_count'] = col
+        elif 'away_team_goal_count' in cl: cmap['away_team_goal_count'] = col
+        elif 'home_team_shots' in cl and 'on_target' not in cl: cmap['home_team_shots'] = col
+        elif 'away_team_shots' in cl and 'on_target' not in cl: cmap['away_team_shots'] = col
+        elif 'home_team_shots_on_target' in cl: cmap['home_team_shots_on_target'] = col
+        elif 'away_team_shots_on_target' in cl: cmap['away_team_shots_on_target'] = col
+        elif 'home_team_corner_count' in cl: cmap['home_team_corner_count'] = col
+        elif 'away_team_corner_count' in cl: cmap['away_team_corner_count'] = col
+        elif 'home_team_possession' in cl: cmap['home_team_possession'] = col
+        elif 'away_team_possession' in cl: cmap['away_team_possession'] = col
+        elif 'home_team_fouls' in cl: cmap['home_team_fouls'] = col
+        elif 'away_team_fouls' in cl: cmap['away_team_fouls'] = col
+        elif 'home_team_yellow_cards' in cl: cmap['home_team_yellow_cards'] = col
+        elif 'away_team_yellow_cards' in cl: cmap['away_team_yellow_cards'] = col
+        elif 'home team pre-match xg' in cl: cmap['Home Team Pre-Match xG'] = col
+        elif 'away team pre-match xg' in cl: cmap['Away Team Pre-Match xG'] = col
     req = ['home_team_name', 'away_team_name', 'home_team_goal_count', 'away_team_goal_count']
     for r in req:
         if r not in cmap:
-            st.error(f"❌ 找不到必需列：{r}")
-            st.write("当前CSV列名：", df_all.columns.tolist())
             return None, None, None, None
     df = pd.DataFrame()
     for k, cn in cmap.items():
@@ -629,96 +531,24 @@ def train_models():
     return clf, reg, scaler, fcols
 
 def predict_match(clf, reg, scaler, fcols, home, away, hs, as_):
-    if clf is None:
-        return None
-    d = {'shots_diff': hs.get('shots', 0) - as_.get('shots', 0),
-         'shots_on_target_diff': hs.get('shots_on_target', 0) - as_.get('shots_on_target', 0),
-         'corner_diff': hs.get('corners', 0) - as_.get('corners', 0),
-         'possession_diff': hs.get('possession', 50) - as_.get('possession', 50),
-         'foul_diff': hs.get('fouls', 0) - as_.get('fouls', 0),
-         'yellow_diff': hs.get('yellow_cards', 0) - as_.get('yellow_cards', 0),
-         'xG_diff': hs.get('xg', 0) - as_.get('xg', 0)}
+    if clf is None: return None
+    d = {'shots_diff': hs.get('shots',0)-as_.get('shots',0),
+         'shots_on_target_diff': hs.get('shots_on_target',0)-as_.get('shots_on_target',0),
+         'corner_diff': hs.get('corners',0)-as_.get('corners',0),
+         'possession_diff': hs.get('possession',50)-as_.get('possession',50),
+         'foul_diff': hs.get('fouls',0)-as_.get('fouls',0),
+         'yellow_diff': hs.get('yellow_cards',0)-as_.get('yellow_cards',0),
+         'xG_diff': hs.get('xg',0)-as_.get('xg',0)}
     X = np.array([[d[c] for c in fcols]])
     Xs = scaler.transform(X)
     rp = clf.predict_proba(Xs)[0]
     rp_idx = np.argmax(rp)
-    rl = {0: '客胜', 1: '平局', 2: '主胜'}[rp_idx]
+    rl = {0:'客胜',1:'平局',2:'主胜'}[rp_idx]
     gp = reg.predict_proba(Xs)[0]
     gi = np.argmax(gp)
     gl = str(gi) if gi < 5 else '5+'
     return {'result': rl, 'result_prob': rp[rp_idx], 'goals': gl, 'goals_prob': gp[gi],
             'probs': {'主胜': rp[2], '平局': rp[1], '客胜': rp[0]}}
-
-def run_backtest(df, clf, reg, scaler, fcols):
-    df = df.copy()
-    df['shots_diff'] = df['home_team_shots'] - df['away_team_shots']
-    df['shots_on_target_diff'] = df['home_team_shots_on_target'] - df['away_team_shots_on_target']
-    df['corner_diff'] = df['home_team_corner_count'] - df['away_team_corner_count']
-    df['possession_diff'] = df['home_team_possession'] - df['away_team_possession']
-    df['foul_diff'] = df['home_team_fouls'] - df['away_team_fouls']
-    df['yellow_diff'] = df['home_team_yellow_cards'] - df['away_team_yellow_cards']
-    df['xG_diff'] = df['Home Team Pre-Match xG'] - df['Away Team Pre-Match xG']
-    X = df[fcols].fillna(0)
-    Xs = scaler.transform(X)
-    rp = clf.predict(Xs)
-    rpp = clf.predict_proba(Xs)
-    gp = reg.predict(Xs)
-    rr = np.where(df['home_team_goal_count'] > df['away_team_goal_count'], 2,
-                  np.where(df['home_team_goal_count'] == df['away_team_goal_count'], 1, 0))
-    rg = np.clip(df['home_team_goal_count'] + df['away_team_goal_count'], 0, 5)
-    rgl = rg.apply(lambda x: str(x) if x < 5 else '5+')
-    rlm = {0: '客胜', 1: '平局', 2: '主胜'}
-    pr = [rlm[x] for x in rp]
-    rr_l = [rlm[x] for x in rr]
-    glm = {0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5+'}
-    pg = [glm[x] for x in gp]
-    ps = []
-    for i, row in df.iterrows():
-        if pr[i] == '主胜':
-            g = int(pg[i]) if pg[i] != '5+' else 4
-            ps.append(f"{g}:0" if g > 0 else "1:0")
-        elif pr[i] == '客胜':
-            g = int(pg[i]) if pg[i] != '5+' else 4
-            ps.append(f"0:{g}" if g > 0 else "0:1")
-        else:
-            g = int(pg[i]) if pg[i] != '5+' else 4
-            ps.append(f"{g // 2}:{g - g // 2}")
-    rs = df['home_team_goal_count'].astype(str) + ':' + df['away_team_goal_count'].astype(str)
-    gw = df['Game Week'].fillna('KO').astype(str)
-    stage = []
-    for i, g in enumerate(gw):
-        if g in ['1', '2', '3']:
-            if g == '1':
-                stage.append('小组赛（第1轮）')
-            elif g == '2':
-                stage.append('小组赛（第2轮）')
-            else:
-                stage.append('小组赛（第3轮）')
-        else:
-            if ('Jul 15' in df.iloc[i]['date_GMT'] or 'Dec 18' in df.iloc[i]['date_GMT']):
-                stage.append('决赛')
-            else:
-                stage.append('淘汰赛')
-    res = pd.DataFrame({'主队': df['home_team_name'], '客队': df['away_team_name'],
-                        '真实比分': rs, '预测比分': ps,
-                        '真实结果': rr_l, '预测结果': pr,
-                        '结果正确': np.array(rr_l) == np.array(pr),
-                        '真实总进球': rgl, '预测总进球': pg,
-                        '进球正确': np.array(rgl) == np.array(pg),
-                        '战意': stage,
-                        '主胜概率': [f"{p[2]:.1%}" for p in rpp],
-                        '平局概率': [f"{p[1]:.1%}" for p in rpp],
-                        '客胜概率': [f"{p[0]:.1%}" for p in rpp]})
-    total = len(res)
-    acc = res['结果正确'].mean()
-    gacc = res['进球正确'].mean()
-    sacc = (res['真实比分'] == res['预测比分']).mean()
-    stage_stats = res.groupby('战意').agg(准确率=('结果正确', 'mean'),
-                                          进球准确率=('进球正确', 'mean'),
-                                          场次=('结果正确', 'count')).reset_index()
-    cm = confusion_matrix(res['真实结果'], res['预测结果'], labels=['客胜', '平局', '主胜'])
-    return res, {'总准确率': acc, '总进球准确率': gacc, '比分准确率': sacc, '总场次': total,
-                 '阶段统计': stage_stats, '混淆矩阵': cm, '混淆矩阵标签': ['客胜', '平局', '主胜']}
 
 # ==================== UI 界面 ====================
 st.markdown("""<style>
@@ -734,8 +564,8 @@ st.markdown("""<style>
 </style>""", unsafe_allow_html=True)
 
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ V6.0 足球预测 · 48队完整优化版")
-st.caption("模糊匹配 · 置信度标注 · 导出报告 · 历史持久化 · 实力可视化 · 批量预测")
+st.title("⚽ V6.0 足球预测 · 精简核心版")
+st.caption("48队数据 · 机器学习 · 易经占卜 · 泊松分布 · 四层推演")
 
 with st.spinner("正在训练机器学习模型..."):
     clf, reg, scaler, fcols = train_models()
@@ -762,17 +592,6 @@ with st.expander("📋 输入比赛信息", expanded=True):
     match_time = st.time_input("比赛时间", datetime.time(0, 0))
     match_dt = datetime.datetime.combine(match_date, match_time)
 
-with st.expander("🔧 补丁设置 & 比赛阶段", expanded=False):
-    cp1, cp2 = st.columns(2)
-    with cp1:
-        home_rot = st.number_input("主队轮换人数(≥4触发补丁①)", min_value=0, max_value=11, value=0, step=1)
-        away_rot = st.number_input("客队轮换人数(≥4触发补丁①)", min_value=0, max_value=11, value=0, step=1)
-        dta = st.selectbox("打平即可出线（补丁②）", ["无", "主队", "客队"])
-        odds_up = st.checkbox("大小球盘口升盘（补丁③诱大警报）")
-    with cp2:
-        st.caption("补丁④（半场落后≥2球）需临场数据，暂不设开关。")
-        st.caption("补丁⑤（屠杀局）根据xG自动调整。")
-
 match_type = st.selectbox("比赛阶段", [
     "小组赛",
     "1/16决赛",
@@ -782,40 +601,6 @@ match_type = st.selectbox("比赛阶段", [
     "季军赛",
     "决赛"
 ])
-
-with st.expander("📊 批量预测（上传CSV）", expanded=False):
-    st.caption("CSV格式：主队,客队,比赛阶段（可选，默认小组赛）")
-    uploaded_file = st.file_uploader("上传CSV文件", type=["csv"])
-    if uploaded_file is not None:
-        batch_df = pd.read_csv(uploaded_file)
-        st.dataframe(batch_df)
-        if st.button("执行批量预测", use_container_width=True):
-            results = []
-            for idx, row in batch_df.iterrows():
-                h_name = fuzzy_match(str(row.iloc[0]), TEAM_NAMES)
-                a_name = fuzzy_match(str(row.iloc[1]), TEAM_NAMES)
-                if not h_name or not a_name:
-                    results.append({"主队": row.iloc[0], "客队": row.iloc[1], "结果": "❌ 球队名无法识别"})
-                    continue
-                stage = row.iloc[2] if len(row) > 2 else "小组赛"
-                stage_map = {"小组赛":"group","1/16决赛":"round_32","1/8决赛":"round_16","1/4决赛":"quarter","半决赛":"semi","季军赛":"third","决赛":"final"}
-                mtk = stage_map.get(stage, "group")
-                he = TEAM_DATA[h_name]["elo"]; hx = TEAM_DATA[h_name]["xg"]
-                ae = TEAM_DATA[a_name]["elo"]; ax = TEAM_DATA[a_name]["xg"]
-                patches = {"home_rotation":0, "away_rotation":0, "draw_to_advance":"none", "odds_up":False}
-                res = four_step_predict(h_name, a_name, mtk, he, ae, hx, ax, patches)
-                results.append({
-                    "主队": h_name,
-                    "客队": a_name,
-                    "阶段": stage,
-                    "首推方向": res['direction_primary'],
-                    "首推比分": res['score_primary'],
-                    "次推比分": res['score_secondary']
-                })
-            df_res = pd.DataFrame(results)
-            st.dataframe(df_res)
-            csv = df_res.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 下载批量预测结果", data=csv, file_name="batch_predictions.csv", mime="text/csv")
 
 if st.button("🔮 开始推演", use_container_width=True):
     if not home or not away:
@@ -846,9 +631,8 @@ if st.button("🔮 开始推演", use_container_width=True):
             "决赛": "final"
         }
         mtk = mt_map[match_type]
-        patches = {"home_rotation": home_rot, "away_rotation": away_rot,
-                   "draw_to_advance": "none" if dta == "无" else ("home" if dta == "主队" else "away"),
-                   "odds_up": odds_up}
+        patches = {}  # 无补丁设置
+
         if clf:
             st.divider()
             st.markdown("## 🤖 机器学习预测")
@@ -868,6 +652,7 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.markdown(
                     f"""<div class="ml-pred"><b>预测结果：</b>{ml['result']}（概率 {ml['result_prob']:.1%}）{confidence}<br><b>最可能总进球：</b>{ml['goals']}球（概率 {ml['goals_prob']:.1%}）<br><b>详细：</b>主胜 {ml['probs']['主胜']:.1%}，平局 {ml['probs']['平局']:.1%}，客胜 {ml['probs']['客胜']:.1%}</div>""",
                     unsafe_allow_html=True)
+
         st.divider()
         st.markdown("## 🔮 第一阶段：卦象分析（笔画起卦）")
         ga = full_gua_analysis(home, away, mtk)
@@ -889,10 +674,11 @@ if st.button("🔮 开始推演", use_container_width=True):
             st.markdown(f"**象辞**：{g['xiang_ci']}")
         st.write("**💊 病药体系**：" + by['病药'])
         st.write(f"用神：{by['用神']} | 忌神：{by['忌神']} | 元神：{by['元神']} | 仇神：{by['仇神']}")
+
         st.divider()
         st.markdown("## 📜 第二阶段：古代杂占")
         sc = get_shichen_from_time(match_dt)
-        sc_time = ['23-1', '1-3', '3-5', '5-7', '7-9', '9-11', '11-13', '13-15', '15-17', '17-19', '19-21', '21-23']
+        sc_time = ['23-1','1-3','3-5','5-7','7-9','9-11','11-13','13-15','15-17','17-19','19-21','21-23']
         st.write(f"**比赛时辰**：{sc}时（{sc_time[SHICHEN.index(sc)]}）")
         cz1, cz2 = st.columns(2)
         with cz1:
@@ -909,6 +695,7 @@ if st.button("🔮 开始推演", use_container_width=True):
             st.markdown(f"**肉颤**：{ROU_CHAN[sc]}")
             st.markdown(f"**心惊**：{XIN_JING[sc]}")
             st.markdown(f"**鹊噪**：{QUE_ZAO[sc]}")
+
         st.divider()
         st.markdown("## 📊 第三阶段：量化计算")
         lh, la = compute_lam(he, ae, hx, ax, patches, mtk)
@@ -916,12 +703,9 @@ if st.button("🔮 开始推演", use_container_width=True):
         for h in range(5):
             for a in range(5):
                 p = poisson_prob(lh, h) * poisson_prob(la, a)
-                if h > a:
-                    hp += p
-                elif h == a:
-                    dp += p
-                else:
-                    ap += p
+                if h > a: hp += p
+                elif h == a: dp += p
+                else: ap += p
         st.write(f"**λ主**：{lh:.2f}，**λ客**：{la:.2f}")
         st.write(f"**主胜概率**：{hp:.1%} | **平局概率**：{dp:.1%} | **客胜概率**：{ap:.1%}")
 
@@ -960,14 +744,10 @@ if st.button("🔮 开始推演", use_container_width=True):
         st.markdown("## 🔄 卦象与量化共振分析")
         quant_direction = res['direction_primary']
         ti_yong = gi['ti_yong']
-        if "体克用" in ti_yong:
-            gua_direction = "主胜"
-        elif "用克体" in ti_yong:
-            gua_direction = "客胜"
-        elif "比和" in ti_yong or "相生" in ti_yong:
-            gua_direction = "平局"
-        else:
-            gua_direction = "不明"
+        if "体克用" in ti_yong: gua_direction = "主胜"
+        elif "用克体" in ti_yong: gua_direction = "客胜"
+        elif "比和" in ti_yong or "相生" in ti_yong: gua_direction = "平局"
+        else: gua_direction = "不明"
         st.write(f"**量化模型预测方向**：{quant_direction}")
         st.write(f"**卦象体用生克方向**：{gua_direction}（{ti_yong}）")
         if quant_direction == gua_direction:
@@ -997,12 +777,7 @@ if st.button("🔮 开始推演", use_container_width=True):
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.caption("补丁状态：" + (
-            "✅ 补丁①（轮换）触发 " if home_rot >= 4 or away_rot >= 4 else "") + (
-            "✅ 补丁②（打平即可出线）触发 " if dta != "无" else "") + (
-            "✅ 补丁③（诱大警报）触发 " if odds_up else "") + (
-            "✅ 补丁⑤（屠杀局）触发" if hx >= 2.0 and ax <= 1.0 else ""))
-        
+
         report_text = f"""⚽ 足球预测报告
 ================================
 主队：{home}（ELO={he}, xG={hx}）
@@ -1038,7 +813,7 @@ if st.button("🔮 开始推演", use_container_width=True):
                 st.caption(f"五行：{y['wuxing']}，六亲：{y['liuqin']}（{LIUQIN_MAP.get(y['liuqin'], '')}），吉凶：{y['jixiong']}")
                 st.write(y['text'])
                 st.markdown("---")
-        
+
         record = {
             "时间": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
             "主队": home,
@@ -1052,53 +827,14 @@ if st.button("🔮 开始推演", use_container_width=True):
         save_history(st.session_state.predict_history)
         st.toast("✅ 预测已保存至历史记录！", icon="💾")
         st.divider()
-        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 48队完整优化版")
-
-st.divider()
-st.markdown("## 📊 回测历史数据（2018+2022）")
-if st.button("📊 执行回测", use_container_width=True):
-    files = [
-        os.path.join(BASE_DIR, "international-fifa-world-cup-2018-russia-matches-2018-to-2018-stats.csv"),
-        os.path.join(BASE_DIR, "international-fifa-world-cup-2022-qatar-matches-2022-to-2022-stats.csv")
-    ]
-    dfs = []
-    for f in files:
-        if os.path.exists(f):
-            dfs.append(pd.read_csv(f))
-    if not dfs:
-        st.error("❌ 未找到CSV文件，请将数据文件放在应用目录下。")
-    else:
-        df_all = pd.concat(dfs, ignore_index=True)
-        if clf is None:
-            st.warning("模型未训练，正在重新训练...")
-            clf, reg, scaler, fcols = train_models()
-            if clf is None:
-                st.error("❌ 训练失败，无法回测。请检查CSV文件列名是否正确。")
-                st.stop()
-        with st.spinner("回测中，请稍候..."):
-            results_df, stats = run_backtest(df_all, clf, reg, scaler, fcols)
-        st.success("✅ 回测完成！")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("总场次", stats['总场次'])
-        c2.metric("结果准确率", f"{stats['总准确率']:.1%}")
-        c3.metric("总进球准确率", f"{stats['总进球准确率']:.1%}")
-        c4.metric("比分准确率", f"{stats['比分准确率']:.1%}")
-        st.subheader("📈 分阶段准确率")
-        st.dataframe(stats['阶段统计'].style.format({'准确率': '{:.1%}', '进球准确率': '{:.1%}'}))
-        st.subheader("📊 混淆矩阵")
-        cm_df = pd.DataFrame(stats['混淆矩阵'], index=stats['混淆矩阵标签'], columns=stats['混淆矩阵标签'])
-        st.dataframe(cm_df)
-        with st.expander("📋 查看每场比赛详细预测对比", expanded=False):
-            st.dataframe(results_df)
-        csv = results_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 下载回测结果CSV", data=csv, file_name="backtest_results.csv", mime="text/csv")
+        st.caption("心源心法：爻象定真，共振取象，三象合一。V6.0 精简核心版")
 
 st.divider()
 st.markdown("## 📋 我的预测历史")
 if st.session_state.predict_history:
     df_history = pd.DataFrame(st.session_state.predict_history)
     st.dataframe(df_history, use_container_width=True, hide_index=True)
-    col_clear1, col_clear2 = st.columns([1, 5])
+    col_clear1, col_clear2 = st.columns([1,5])
     with col_clear1:
         if st.button("🗑️ 清空历史", use_container_width=True):
             st.session_state.predict_history = []
