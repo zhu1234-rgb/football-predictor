@@ -5,65 +5,43 @@ import hashlib
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻·足球预测", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 足球预测引擎")
-st.caption("输入Elo + 必发指数，自动起卦解卦融合二十八法")
+st.set_page_config(page_title="⚽ 六爻·胜平负预测", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 胜平负预测引擎")
+st.caption("融合《春秋太卜》《六爻心源》取象法 | 输入Elo + 必发指数，自动起卦解卦")
 
 # ============================================================
-# 2. 知识库模块（略，与之前完全相同，保留完整的知识库）
+# 2. 知识库（书籍核心取象，用于卦象解读）
 # ============================================================
 GUA_LEI_XIANG = {
-    "乾": {"五行":"金","人物":"领导、父亲","场所":"京都","方位":"西北","数字":"1,6","动物":"马","静物":"金玉","人体":"头","颜色":"白","五味":"辛"},
-    "坤": {"五行":"土","人物":"母亲、老妇","场所":"田野","方位":"西南","数字":"2,8","动物":"牛","静物":"五谷","人体":"腹","颜色":"黄","五味":"甘"},
-    "震": {"五行":"木","人物":"长男、军人","场所":"森林","方位":"东","数字":"4,3","动物":"龙","静物":"竹","人体":"足","颜色":"绿","五味":"酸"},
-    "巽": {"五行":"木","人物":"长女、教师","场所":"邮局","方位":"东南","数字":"5,4","动物":"鸡","静物":"绳","人体":"股","颜色":"蓝","五味":"酸"},
-    "坎": {"五行":"水","人物":"中男、医生","场所":"江河","方位":"北","数字":"1,6","动物":"猪","静物":"油","人体":"耳","颜色":"黑","五味":"咸"},
-    "离": {"五行":"火","人物":"中女、文人","场所":"影院","方位":"南","数字":"3,9","动物":"孔雀","静物":"书画","人体":"眼","颜色":"红","五味":"苦"},
-    "艮": {"五行":"土","人物":"少男、警卫","场所":"山丘","方位":"东北","数字":"7,8","动物":"狗","静物":"石","人体":"鼻","颜色":"棕","五味":"甘"},
-    "兑": {"五行":"金","人物":"少女、歌手","场所":"沼泽","方位":"西","数字":"2,7","动物":"羊","静物":"刀","人体":"口","颜色":"白","五味":"辛"}
+    "乾": {"五行":"金","人物":"领导、父亲、冠军","场所":"京都","方位":"西北","数字":"1,6","动物":"马","静物":"金玉","人体":"头","颜色":"白","五味":"辛","比赛":"冠军、强势方、大胜"},
+    "坤": {"五行":"土","人物":"母亲、老妇、民众","场所":"田野","方位":"西南","数字":"2,8","动物":"牛","静物":"五谷","人体":"腹","颜色":"黄","五味":"甘","比赛":"被动挨打、防守反击"},
+    "震": {"五行":"木","人物":"长男、军人、新秀","场所":"森林","方位":"东","数字":"4,3","动物":"龙","静物":"竹","人体":"足","颜色":"绿","五味":"酸","比赛":"新锐冲击、快速反击"},
+    "巽": {"五行":"木","人物":"长女、教师、替补","场所":"邮局","方位":"东南","数字":"5,4","动物":"鸡","静物":"绳","人体":"股","颜色":"蓝","五味":"酸","比赛":"边路传中、定位球"},
+    "坎": {"五行":"水","人物":"中男、医生、守门员","场所":"江河","方位":"北","数字":"1,6","动物":"猪","静物":"油","人体":"耳","颜色":"黑","五味":"咸","比赛":"防守稳固、点球大战"},
+    "离": {"五行":"火","人物":"中女、文人、核心球员","场所":"影院","方位":"南","数字":"3,9","动物":"孔雀","静物":"书画","人体":"眼","颜色":"红","五味":"苦","比赛":"核心发挥、进球大战"},
+    "艮": {"五行":"土","人物":"少男、后卫、替补","场所":"山丘","方位":"东北","数字":"7,8","动物":"狗","静物":"石","人体":"鼻","颜色":"棕","五味":"甘","比赛":"防守反击、铁桶阵"},
+    "兑": {"五行":"金","人物":"少女、歌手、边锋","场所":"沼泽","方位":"西","数字":"2,7","动物":"羊","静物":"刀","人体":"口","颜色":"白","五味":"辛","比赛":"边路突破、点球决胜"}
 }
 
-LIU_QIN_QU_XIANG = {
-    "父母": {"人物":"师长、长辈","事物":"文书、考试、护照","场所":"学校","性情":"大义","人体":"头","自然":"雨"},
-    "兄弟": {"人物":"同学、竞争者","事物":"破财、阻隔","场所":"赌场","性情":"仗义","人体":"手足","自然":"风"},
-    "子孙": {"人物":"晚辈、医生、警察","事物":"财源、游乐、解忧","场所":"医院","性情":"善良","人体":"眼耳","自然":"晴"},
-    "官鬼": {"人物":"领导、官方、小人","事物":"工作、官职、疾病","场所":"法院","性情":"刚强","人体":"心脏","自然":"雷电"},
-    "妻财": {"人物":"妻子、下属","事物":"钱财、利润、食物","场所":"银行","性情":"柔弱","人体":"血液","自然":"云"}
-}
-
+# 二十八法核心断语（比赛专用）
 ER_SHI_BA_FA = {
-    "六合卦": "平局优先（≥60%），总进球≤3",
-    "归魂卦": "胶着反复，平局或小胜，双方有球",
-    "游魂卦": "客队不败或意外赛果",
-    "六冲卦": "优先分胜负，不轻易判平",
-    "体克用": "主胜",
-    "用克体": "客胜",
-    "体用比和": "平局",
-    "官鬼持世": "主队防守压力大，难零封",
-    "子孙伏藏": "主队进攻乏力，最多1-2球",
-    "妻财动化进": "70分钟后进球（补时绝杀）",
-    "互卦归妹": "比赛有扳平、反超剧情",
-    "变卦明夷": "主队有损失（丢球或被追平）",
-    "六冲多动": "必分胜负，绝无闷平",
-    "应爻暗动": "客队先进球或占先机",
-    "世爻安静": "主队后程发力",
-    "平局首选": "1-1 > 0-0 > 2-2",
-    "分胜负区间": "胜方1-2球，负方0-1球",
-    "卦气旺衰": "月建决定旺衰，日辰定根气",
-    "过旺应凶": "能而不能，本该成却没成",
-    "过衰应吉": "不能而能，绝境逢生"
+    "六合卦": "平局倾向高，双方保守，总进球≤3",
+    "归魂卦": "胶着反复，平局或一球小胜",
+    "游魂卦": "客队不败或爆冷",
+    "六冲卦": "分胜负，不轻易判平",
+    "体克用": "主胜（主队克制客队）",
+    "用克体": "客胜（客队克制主队）",
+    "体用比和": "平局（双方势均力敌）",
+    "世应相生": "主客和谐，平局或主不败",
+    "世应相克": "分胜负，对抗激烈",
+    "过旺应凶": "大热必死，热门方不胜",
+    "过衰应吉": "哀兵必胜，冷门方不败",
+    "乾为冠军": "乾卦出现或主事，冠军倾向",
+    "兑为伤病": "兑卦受伤，核心球员伤病",
+    "震为新星": "震卦发动，新星爆发",
+    "坎为防守": "坎卦当令，防守稳固",
+    "离为核心": "离卦当令，核心发挥"
 }
-
-def query_knowledge(keyword):
-    if keyword in GUA_LEI_XIANG:
-        info = GUA_LEI_XIANG[keyword]
-        return f"【{keyword}卦】\n五行：{info['五行']}\n人物：{info['人物']}\n场所：{info['场所']}\n方位：{info['方位']}\n数字：{info['数字']}\n动物：{info['动物']}\n静物：{info['静物']}\n人体：{info['人体']}\n颜色：{info['颜色']}\n五味：{info['五味']}"
-    if keyword in LIU_QIN_QU_XIANG:
-        info = LIU_QIN_QU_XIANG[keyword]
-        return f"【{keyword}爻】\n人物：{info['人物']}\n事物：{info['事物']}\n场所：{info['场所']}\n性情：{info['性情']}\n人体：{info['人体']}\n自然：{info['自然']}"
-    if keyword in ER_SHI_BA_FA:
-        return f"【{keyword}】\n{ER_SHI_BA_FA[keyword]}"
-    return "未找到，试试输入卦名（乾/坤）、六亲（父母/官鬼）或断语（六合卦）"
 
 # ============================================================
 # 3. 卦象数据结构
@@ -96,10 +74,10 @@ GUIHUN_SET = {"大有","需","大畜","随","蛊","同人","晋","归妹"}
 YOUHUN_SET = {"需","讼","明夷","晋","中孚","大过","颐","大壮"}
 LIUCHONG_SET = {"乾","坎","兑","离","震","巽","艮","坤"}
 
-LEAGUE_AVG_TOTAL = {"英超":2.8,"西甲":2.6,"德甲":2.9,"意甲":2.5,"法甲":2.5,"日职":2.4,"K联赛":2.3,"世界杯":2.2}
+LEAGUE_AVG_TOTAL = {"英超":2.8,"西甲":2.6,"德甲":2.9,"意甲":2.5,"法甲":2.5,"日职":2.4,"K联赛":2.3,"世界杯":2.2,"欧冠":2.6,"欧联":2.5}
 
 # ============================================================
-# 4. 自动起卦函数
+# 4. 自动起卦函数（根据队名哈希）
 # ============================================================
 def auto_gua_by_teams(home, away):
     combined = f"{home}_{away}"
@@ -114,7 +92,7 @@ def auto_gua_by_teams(home, away):
     return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
 
 # ============================================================
-# 5. 五行生克函数
+# 5. 五行生克与八卦性情（《春秋太卜》取象法）
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
@@ -126,8 +104,27 @@ def wuxing_sheng_ke(wo, ta):
     elif ke[ta] == wo: return 2
     else: return 0
 
+# 八卦性情取象（用于比赛风格解读）
+GUA_XING_QING = {
+    "乾": "刚健主动，冠军气质，进攻为主",
+    "坤": "柔顺被动，防守反击，稳扎稳打",
+    "震": "活跃冲动，快速反击，冲击力强",
+    "巽": "灵活多变，边路渗透，定位球战术",
+    "坎": "沉稳防守，门将神勇，点球决胜",
+    "离": "华丽进攻，核心球员，进球大战",
+    "艮": "坚固防守，密集阵型，小胜格局",
+    "兑": "边路突破，点球机会，伤病隐患"
+}
+
+def get_gua_style(gua):
+    return GUA_XING_QING.get(gua, "常规打法")
+
+def get_gua_competition(gua):
+    info = GUA_LEI_XIANG.get(gua, {})
+    return info.get("比赛", "常规")
+
 # ============================================================
-# 6. 自动解卦函数
+# 6. 自动解卦函数（融合二十八法 + 春秋太卜取象）
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     ping_ju = 0.0
@@ -137,28 +134,37 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     both_score = False
     fen_sheng_fu = 0.0
     detail = []
+    gua_analysis = []
 
+    # 本卦属性
     if zhu_gua in LIUHE_SET:
         ping_ju += 0.6
         jin_qiu_limit = 3
-        detail.append("六合→平局优先，总进球≤3")
+        detail.append("六合→平局优先")
+        gua_analysis.append("六合卦：双方保守，平局倾向高")
     if zhu_gua in GUIHUN_SET:
         ping_ju += 0.3
         both_score = True
-        detail.append("归魂→双方有球")
+        detail.append("归魂→胶着反复")
+        gua_analysis.append("归魂卦：胶着反复，小比分")
     if zhu_gua in YOUHUN_SET:
         ke_adv *= 1.15
         detail.append("游魂→客不败")
+        gua_analysis.append("游魂卦：客队不败或爆冷")
     if zhu_gua in LIUCHONG_SET:
         fen_sheng_fu += 0.7
         detail.append("六冲→分胜负")
+        gua_analysis.append("六冲卦：对抗激烈，必分胜负")
 
     if bian_gua in LIUHE_SET:
         ping_ju += 0.4
         detail.append("变卦六合→趋平")
+        gua_analysis.append("变卦六合：趋向平局")
 
+    # 体用生克（梅花易数 + 春秋太卜）
     if dong_yao == "无动爻":
         detail.append("无动爻→体用比和")
+        gua_analysis.append("无动爻：双方实力均衡")
     else:
         dong_idx = {"初爻":0,"二爻":1,"三爻":2,"四爻":3,"五爻":4,"上爻":5}[dong_yao]
         shang, xia = GUA_STRUCT[zhu_gua]
@@ -174,31 +180,52 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
         if rel == -2:
             zhu_adv *= 1.12
             detail.append("用生体→主利")
+            gua_analysis.append("客生主：主队得势得利")
         elif rel == 2:
             ke_adv *= 1.15
             detail.append("用克体→客利")
+            gua_analysis.append("客克主：客队占优")
         elif rel == 1:
             ke_adv *= 1.10
             ping_ju += 0.15
             detail.append("体生用→主耗，客不败")
+            gua_analysis.append("主生客：主队消耗大，客队不败")
         elif rel == -1:
             zhu_adv *= 1.10
             detail.append("体克用→主胜机")
+            gua_analysis.append("主克客：主队胜机更大")
         else:
             ping_ju += 0.3
             detail.append("比和→平局")
+            gua_analysis.append("体用比和：势均力敌")
 
+    # 动爻位置
     dong_effect = {"无动爻":1.0,"初爻":0.85,"二爻":0.9,"三爻":1.0,"四爻":1.05,"五爻":1.1,"上爻":1.15}
     dong_factor = dong_effect.get(dong_yao, 1.0)
     if dong_yao in ["四爻","五爻","上爻"]:
         zhu_adv *= 1.05
-        detail.append("动在上卦→进攻端")
+        detail.append("动在上卦→进攻端活跃")
+        gua_analysis.append("上卦动：进攻端活跃")
     else:
         ke_adv *= 1.05
-        detail.append("动在下卦→防守端")
+        detail.append("动在下卦→防守端稳固")
+        gua_analysis.append("下卦动：防守端稳固")
 
+    # 综合系数
     zong_he = 1.0 + (zhu_adv-1.0) + (ke_adv-1.0) + (ping_ju*0.3) - (fen_sheng_fu*0.2)
     zong_he = max(0.5, min(1.5, zong_he))
+
+    # 比赛风格解读
+    zhu_style = get_gua_style(zhu_gua)
+    bian_style = get_gua_style(bian_gua)
+    gua_analysis.append(f"主卦风格：{zhu_style}")
+    gua_analysis.append(f"变卦风格：{bian_style}")
+
+    # 冠军/爆冷判断（《春秋太卜》乾为冠军）
+    if zhu_gua == "乾" and dong_yao in ["五爻","上爻"]:
+        gua_analysis.append("乾卦动于上位：冠军相显，主队强势")
+    if zhu_gua in LIUCHONG_SET and dong_yao != "无动爻":
+        gua_analysis.append("六冲有动：对抗激烈，无闷平")
 
     return {
         "ping_ju_tend": min(1.0, ping_ju),
@@ -208,21 +235,23 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
         "both_score": both_score,
         "fen_sheng_fu": fen_sheng_fu,
         "zong_he": round(zong_he, 3),
-        "detail": "；".join(detail) if detail else "常规"
+        "detail": "；".join(detail) if detail else "常规",
+        "analysis": " | ".join(gua_analysis) if gua_analysis else "常规分析"
     }
 
 # ============================================================
-# 7. 核心预测函数
+# 7. 核心预测函数（Elo + 六爻修正）
 # ============================================================
 def poisson_prob(lam, k):
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
 
-def predict_score(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_small):
+def predict_wdl(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_small):
     total_goals = league_avg
     elo_sum = elo_h + elo_a
     lam_h = total_goals * (elo_h / elo_sum) * 2
     lam_a = total_goals * (elo_a / elo_sum) * 2
 
+    # 必发修正
     if bf_big > 65 and bf_small < 35:
         lam_h *= 1.2; lam_a *= 1.2
     elif bf_big > 60:
@@ -230,6 +259,7 @@ def predict_score(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_sma
     elif bf_small > 60 and bf_big < 40:
         lam_h *= 0.9; lam_a *= 0.9
 
+    # 六爻因子
     zhu_adv = liu_factors["zhu_advantage"]
     ke_adv = liu_factors["ke_advantage"]
     ping_ju = liu_factors["ping_ju_tend"]
@@ -238,7 +268,7 @@ def predict_score(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_sma
     fen_sheng = liu_factors["fen_sheng_fu"]
     zong = liu_factors["zong_he"]
 
-    # 平局逻辑：降低总进球并拉近两队
+    # 平局逻辑
     if ping_ju > 0.5:
         adjust = 1.0 - (ping_ju - 0.5) * 0.4
         zong = min(zong, adjust)
@@ -268,118 +298,117 @@ def predict_score(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_sma
     lam_h = max(0.3, lam_h)
     lam_a = max(0.3, lam_a)
 
-    scores = {}
-    for i in range(5):
-        for j in range(5):
-            prob = poisson_prob(lam_h, i) * poisson_prob(lam_a, j)
-            scores[f"{i}-{j}"] = prob * 100
-    return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:5], lam_h, lam_a
+    # 胜平负概率（0~7球范围）
+    win_prob = 0.0
+    draw_prob = 0.0
+    lose_prob = 0.0
+    for i in range(8):
+        for j in range(8):
+            prob = (math.exp(-lam_h) * (lam_h ** i) / math.factorial(i)) * \
+                   (math.exp(-lam_a) * (lam_a ** j) / math.factorial(j))
+            if i > j:
+                win_prob += prob
+            elif i == j:
+                draw_prob += prob
+            else:
+                lose_prob += prob
+
+    # 卦象修正：平局倾向加强
+    if ping_ju > 0.5:
+        draw_prob = draw_prob * (1 + ping_ju * 0.3)
+        total = win_prob + draw_prob + lose_prob
+        if total > 0:
+            win_prob /= total
+            draw_prob /= total
+            lose_prob /= total
+
+    return win_prob * 100, draw_prob * 100, lose_prob * 100, lam_h, lam_a
 
 # ============================================================
-# 8. 生成报告函数
+# 8. 生成报告函数（融入书籍取象解读）
 # ============================================================
 def generate_report(home, away, league, elo_h, elo_a, bf_big, bf_small,
-                    zhan_yi, liu_factors, top_scores, lam_h, lam_a):
-
-    # 胜平负概率计算
-    win_sum = draw_sum = lose_sum = 0
-    for i in range(5):
-        for j in range(5):
-            p = poisson_prob(lam_h, i) * poisson_prob(lam_a, j) * 100
-            if i > j: win_sum += p
-            elif i == j: draw_sum += p
-            else: lose_sum += p
-
-    # 总进球概率
-    goals_prob = {}
-    for g in range(6):
-        prob = 0
-        for i in range(max(0, g-4), min(4, g)+1):
-            j = g - i
-            if 0 <= j <= 4:
-                prob += poisson_prob(lam_h, i) * poisson_prob(lam_a, j)
-        goals_prob[g] = prob * 100
-
-    # 根据概率确定首推次推
-    prob_map = {"胜": win_sum, "平": draw_sum, "负": lose_sum}
-    sorted_probs = sorted(prob_map.items(), key=lambda x: x[1], reverse=True)
-
-    # 比分首推
-    top1_score = top_scores[0][0]
-    top2_score = top_scores[1][0] if len(top_scores) > 1 else "---"
-
-    # 总进球首推
-    sorted_goals = sorted(goals_prob.items(), key=lambda x: x[1], reverse=True)
-    goal1 = sorted_goals[0][0]
-    goal2 = sorted_goals[1][0] if len(sorted_goals) > 1 else sorted_goals[0][0]
-
-    # 置信度计算
-    confidence = 60 + min(20, (max(win_sum, draw_sum, lose_sum) - 30) * 0.5)
-    confidence = min(95, confidence)
+                    zhan_yi, liu_factors, win_p, draw_p, lose_p):
+    probs = {"主胜": win_p, "平局": draw_p, "客胜": lose_p}
+    sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
     # 卦象解读
-    gua_text = liu_factors['detail']
     if liu_factors['ping_ju_tend'] > 0.5:
-        direction = "平局"
-        gua_summary = "卦象显示双方势均力敌，平局可能性较大"
+        gua_summary = "卦象显示平局倾向明显"
+        direction_hint = "平局"
     elif liu_factors['zhu_advantage'] > liu_factors['ke_advantage']:
-        direction = "主胜"
         gua_summary = "卦象显示主队略占优势"
+        direction_hint = "主队"
+    else:
+        gua_summary = "卦象显示客队略占优势"
+        direction_hint = "客队"
+
+    # 比赛风格解读
+    style_info = liu_factors['analysis']
+
+    # 置信度
+    max_p = max(win_p, draw_p, lose_p)
+    confidence = 50 + min(40, (max_p - 30) * 0.8)
+    confidence = min(90, confidence)
+
+    # 方向建议
+    if win_p > draw_p and win_p > lose_p:
+        direction = "主胜"
+        advice = "主队实力占优或状态更好"
+    elif draw_p > win_p and draw_p > lose_p:
+        direction = "平局"
+        advice = "双方势均力敌，或都保守"
     else:
         direction = "客胜"
-        gua_summary = "卦象显示客队略占优势"
+        advice = "客队实力占优或战术克制"
 
-    # 生成报告
     report = f"""
 ┌─────────────────────────────────────────────────────────────┐
-│           📊 推演结论 —— {home} vs {away}                    │
+│           📊 胜平负预测 —— {home} vs {away}                  │
 │                  （{league}）                               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  【1️⃣ 胜平负】                                              │
-│    首推：{sorted_probs[0][0]}（{sorted_probs[0][1]:.1f}%）                          │
-│    次推：{sorted_probs[1][0]}（{sorted_probs[1][1]:.1f}%）                          │
+│  【1️⃣ 首推】{sorted_probs[0][0]}（{sorted_probs[0][1]:.1f}%）                          │
 │                                                             │
-│  【2️⃣ 总进球数】                                            │
-│    首推：{goal1}球（{goals_prob[goal1]:.1f}%）                              │
-│    次推：{goal2}球（{goals_prob[goal2]:.1f}%）                              │
+│  【2️⃣ 次推】{sorted_probs[1][0]}（{sorted_probs[1][1]:.1f}%）                          │
 │                                                             │
-│  【3️⃣ 比分（精准）】                                        │
-│    首推：{top1_score}（{top_scores[0][1]:.1f}%）                           │
-│    次推：{top2_score}（{top_scores[1][1] if len(top_scores)>1 else 0:.1f}%）                           │
+│  【3️⃣ 方向参考】                                            │
+│    ├─ 主胜概率：{win_p:.1f}%                                  │
+│    ├─ 平局概率：{draw_p:.1f}%                                  │
+│    └─ 客胜概率：{lose_p:.1f}%                                  │
 │                                                             │
-│  【方向预测】{direction} ✅                                  │
-│    ├─ 卦象：{gua_summary}                                  │
-│    └─ 关键信号：{gua_text[:50]}...                          │
+│  【卦象贡献】                                                │
+│    ├─ {gua_summary}                                        │
+│    ├─ 综合系数：{liu_factors['zong_he']} ｜ 平局倾向：{liu_factors['ping_ju_tend']:.2f}   │
+│    └─ {style_info[:60]}...                                  │
 │                                                             │
-│  【唯一比分】{top1_score}（概率约{top_scores[0][1]:.0f}%）                     │
-│    ├─ 方向：{sorted_probs[0][0]} ✅                         │
-│    └─ 总进球：{goal1}球 ✅                                  │
-│                                                             │
-│  【投注参考（非建议）】                                    │
-│    ├─ 主胜概率 {win_sum:.1f}%，客胜概率 {lose_sum:.1f}%                      │
-│    ├─ 平局概率 {draw_sum:.1f}%（卦象修正值：{liu_factors['ping_ju_tend']:.2f}）│
-│    └─ 模型置信度：{confidence:.0f}%（综合卦象+数据）                         │
-│                                                             │
-│  【模型置信度】                                            │
-│    ├─ 方向：{min(85, confidence+5):.0f}%（中高）                              │
-│    ├─ 比分：{min(70, confidence-5):.0f}%（中等）                              │
-│    └─ 总进球：{min(75, confidence):.0f}%（中等偏高）                          │
+│  【比赛解读】                                                │
+│    ├─ 方向建议：{direction}                                  │
+│    ├─ 关键依据：{advice}                                    │
+│    └─ 模型置信度：{confidence:.0f}%                          │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│  模型版本：V1.0 六爻融合版                                 │
-│  关键信号：必发{bf_big}/{bf_small} + 综合系数{liu_factors['zong_he']}         │
-│  最大变量：{direction}是否如期兑现（决定全场走势）         │
+│  模型版本：V3.0 春秋太卜融合版                              │
+│  关键信号：必发{bf_big}/{bf_small} + Elo差{elo_h - elo_a}         │
+│  提示：淘汰赛阶段平局概率通常上升                           │
 └─────────────────────────────────────────────────────────────┘
 """
     return report
 
 # ============================================================
-# 9. 知识库查询UI函数
+# 9. 知识库查询（书籍取象查询）
 # ============================================================
+def query_knowledge(keyword):
+    if keyword in GUA_LEI_XIANG:
+        info = GUA_LEI_XIANG[keyword]
+        return f"【{keyword}卦】\n五行：{info['五行']}\n人物：{info['人物']}\n场所：{info['场所']}\n方位：{info['方位']}\n数字：{info['数字']}\n动物：{info['动物']}\n人体：{info['人体']}\n比赛取象：{info['比赛']}\n风格：{GUA_XING_QING.get(keyword, '常规')}"
+    if keyword in ER_SHI_BA_FA:
+        return f"【{keyword}】\n{ER_SHI_BA_FA[keyword]}"
+    return "未找到，试试输入卦名（乾/坤）或断语（六合卦/体克用）"
+
 def knowledge_query_ui():
-    st.subheader("📚 六爻知识库")
-    keyword = st.text_input("输入关键词查询", placeholder="如：乾 或 父母 或 六合卦")
+    st.subheader("📚 卦象知识库")
+    keyword = st.text_input("输入关键词查询", placeholder="如：乾 或 六合卦 或 冠军")
     if st.button("查询", use_container_width=True):
         if keyword:
             st.info(query_knowledge(keyword.strip()))
@@ -387,7 +416,7 @@ def knowledge_query_ui():
             st.warning("请输入关键词")
 
 # ============================================================
-# 10. 界面布局与主程序
+# 10. 界面布局
 # ============================================================
 # 初始化session_state
 if 'zhu_gua' not in st.session_state:
@@ -417,14 +446,6 @@ with st.expander("📊 核心数据", expanded=True):
         elo_away = st.number_input("📊 客队Elo", 1000, 2500, 1850, 10)
 
 with st.expander("🔮 六爻参数（自动起卦）", expanded=False):
-    if st.button("🔄 根据队名自动起卦", use_container_width=True):
-        zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
-        st.session_state.zhu_gua = zhu
-        st.session_state.bian_gua = bian
-        st.session_state.dong_yao = dong
-        st.session_state.liu_result = auto_jie_gua(zhu, bian, dong)
-        st.success(f"起卦完成：主卦 {zhu}，变卦 {bian}，{dong}")
-
     st.write(f"**主卦**: {st.session_state.zhu_gua}　|　**变卦**: {st.session_state.bian_gua}　|　**动爻**: {st.session_state.dong_yao}")
 
     zhan_yi_opt = st.selectbox("战意系数", [("保级/争冠",1.4),("淘汰赛",1.2),("普通联赛",1.0),("无欲无求",0.85),("友谊赛",0.7)],
@@ -434,39 +455,46 @@ with st.expander("🔮 六爻参数（自动起卦）", expanded=False):
     liu = st.session_state.liu_result
     st.write(f"**综合系数**: `{liu['zong_he']}` | **平局倾向**: {liu['ping_ju_tend']:.2f}")
     st.caption(f"详情: {liu['detail']}")
+    st.caption(f"风格解读: {liu['analysis'][:80]}...")
 
-with st.expander("📚 知识库查询", expanded=False):
+with st.expander("📚 卦象知识库", expanded=False):
     knowledge_query_ui()
 
 # ============================================================
-# 11. 预测按钮 + 报告输出
+# 11. 预测按钮
 # ============================================================
 if st.button("🚀 开始预测", type="primary", use_container_width=True):
-    liu_factors = st.session_state.liu_result
-    league_avg = LEAGUE_AVG_TOTAL[league]
+    # 自动起卦
+    zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
+    st.session_state.zhu_gua = zhu
+    st.session_state.bian_gua = bian
+    st.session_state.dong_yao = dong
+    liu_factors = auto_jie_gua(zhu, bian, dong)
+    st.session_state.liu_result = liu_factors
 
-    top_scores, lam_h, lam_a = predict_score(
+    league_avg = LEAGUE_AVG_TOTAL[league]
+    win_p, draw_p, lose_p, lam_h, lam_a = predict_wdl(
         elo_home, elo_away, league_avg, zhan_yi,
         liu_factors, bf_big, bf_small
     )
 
-    # 生成并显示报告
     report = generate_report(
         home_team, away_team, league,
         elo_home, elo_away,
         bf_big, bf_small,
         zhan_yi, liu_factors,
-        top_scores, lam_h, lam_a
+        win_p, draw_p, lose_p
     )
 
     st.code(report, language='text')
 
-    # 额外显示解卦详情
-    with st.expander("🔮 解卦详情"):
-        st.write(f"平局倾向: {liu_factors['ping_ju_tend']:.2f}")
-        st.write(f"主队优势系数: {liu_factors['zhu_advantage']:.2f}")
-        st.write(f"客队优势系数: {liu_factors['ke_advantage']:.2f}")
-        st.write(f"综合系数: {liu_factors['zong_he']}")
-        st.caption(liu_factors['detail'])
+    with st.expander("🔮 完整卦象解读"):
+        st.write(f"**主卦**: {zhu} | **变卦**: {bian} | **动爻**: {dong}")
+        st.write(f"**平局倾向**: {liu_factors['ping_ju_tend']:.2f}")
+        st.write(f"**主队优势系数**: {liu_factors['zhu_advantage']:.2f}")
+        st.write(f"**客队优势系数**: {liu_factors['ke_advantage']:.2f}")
+        st.write(f"**综合系数**: {liu_factors['zong_he']}")
+        st.write(f"**卦象细节**: {liu_factors['detail']}")
+        st.write(f"**风格解读**: {liu_factors['analysis']}")
 
-st.caption("💡 点击「根据队名自动起卦」生成卦象，然后点击「开始预测」")
+st.caption("💡 点击「开始预测」自动根据队名起卦并输出胜平负结果，融合春秋太卜取象法")
