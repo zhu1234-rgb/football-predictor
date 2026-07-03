@@ -8,10 +8,45 @@ from datetime import datetime
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·胜平负预测", layout="centered", initial_sidebar_state="collapsed")
 st.title("⚽ 六爻 · 胜平负预测引擎")
-st.caption("融合《春秋太卜》《六爻心源》取象法 | 输入队名和赛事，自动起卦解卦 | 含逐爻详解")
+st.caption("融合《春秋太卜》《六爻心源》取象法 | 自动起卦 | 仅胜平负")
 
 # ============================================================
-# 2. 卦象数据
+# 2. 赛事列表
+# ============================================================
+LEAGUE_AVG_TOTAL = {
+    "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
+    "欧冠": 2.6, "欧联": 2.5, "欧协联": 2.4,
+    "日职": 2.4, "日乙": 2.3, "K联赛": 2.3, "K2联赛": 2.2,
+    "世界杯": 2.2, "亚洲杯": 2.2, "非洲杯": 2.1, "美洲杯": 2.3, "欧洲杯": 2.4,
+    "芬超": 2.4, "芬甲": 2.3, "挪甲": 2.4, "瑞典超": 2.5, "冰岛超": 2.4,
+    "爱超": 2.3, "爱甲": 2.2, "苏超": 2.5, "英冠": 2.6, "英甲": 2.5, "英乙": 2.4,
+    "荷甲": 2.7, "荷乙": 2.6, "葡超": 2.5, "比甲": 2.5, "土超": 2.4, "俄超": 2.3,
+    "奥甲": 2.4, "瑞士超": 2.4, "丹超": 2.5, "波超": 2.3, "克甲": 2.3,
+    "巴西甲": 2.4, "巴西乙": 2.3, "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
+    "中超": 2.5, "澳超": 2.6, "沙特联": 2.5, "阿联酋超": 2.4, "卡塔尔联": 2.3,
+    "女足世界杯": 2.0, "女足英超": 2.2,
+}
+
+# ============================================================
+# 3. 战意系数（12级分级）
+# ============================================================
+ZHAN_YI_LIST = [
+    ("🏆 决赛生死战", 1.45),
+    ("🔥 出线/保级生死战", 1.40),
+    ("⚔️ 洲际资格卡位战", 1.25),
+    ("💢 德比复仇大战", 1.22),
+    ("🏅 淘汰赛", 1.20),
+    ("📈 刷净胜球卡位战", 1.10),
+    ("⚽ 普通联赛", 1.00),
+    ("🏠 主场荣誉轮换", 0.90),
+    ("😐 无欲无求", 0.85),
+    ("🧪 提前出线练兵", 0.78),
+    ("📉 已降级摆烂", 0.70),
+    ("🤝 友谊赛/热身赛", 0.65),
+]
+
+# ============================================================
+# 4. 卦象数据
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行":"金","人物":"领导、父亲、冠军","比赛":"冠军、强势方、大胜"},
@@ -37,7 +72,7 @@ def get_gua_style(gua):
     return GUA_XING_QING.get(gua, "常规打法")
 
 # ============================================================
-# 3. 卦象数据结构
+# 5. 卦象数据结构
 # ============================================================
 GUA_LIST = [
     "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
@@ -66,10 +101,8 @@ GUIHUN_SET = {"大有","需","大畜","随","蛊","同人","晋","归妹"}
 YOUHUN_SET = {"需","讼","明夷","晋","中孚","大过","颐","大壮"}
 LIUCHONG_SET = {"乾","坎","兑","离","震","巽","艮","坤"}
 
-LEAGUE_AVG_TOTAL = {"英超":2.8,"西甲":2.6,"德甲":2.9,"意甲":2.5,"法甲":2.5,"日职":2.4,"K联赛":2.3,"世界杯":2.2,"欧冠":2.6,"欧联":2.5}
-
 # ============================================================
-# 4. 自动起卦函数（后台执行）
+# 6. 自动起卦函数
 # ============================================================
 def auto_gua_by_teams(home, away):
     combined = f"{home}_{away}"
@@ -84,7 +117,7 @@ def auto_gua_by_teams(home, away):
     return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
 
 # ============================================================
-# 5. 五行生克
+# 7. 五行生克
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
@@ -97,7 +130,7 @@ def wuxing_sheng_ke(wo, ta):
     else: return 0
 
 # ============================================================
-# 6. 六爻逐爻详解
+# 8. 六爻逐爻详解
 # ============================================================
 def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     yao_names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
@@ -114,21 +147,21 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
         is_dong = (yname == dong_yao)
         if is_dong:
             dong_detail = {
-                "初爻": "动于初爻（震位）：事件根基变动，开局或有变数，或从低位起步。",
-                "二爻": "动于二爻（离位）：内部或家宅之变，球队内部或有调整，中场控制关键。",
-                "三爻": "动于三爻（艮位）：竞争转折之变，兄弟之争，走势在中段发生变化。",
-                "四爻": "动于四爻（巽位）：市场或外联变动，边路或替补可能成为奇兵。",
-                "五爻": "动于五爻（坎位）：中枢之动，核心球员表现影响全局，或有关键判罚。",
-                "上爻": "动于上爻（兑位）：终局之变，尾声或有绝杀/绝平，或场外因素干扰。"
+                "初爻": "动于初爻（震位）：事件根基变动，开局或有变数。",
+                "二爻": "动于二爻（离位）：内部或家宅之变，球队内部或有调整。",
+                "三爻": "动于三爻（艮位）：竞争转折之变，走势在中段发生变化。",
+                "四爻": "动于四爻（巽位）：边路或替补可能成为奇兵。",
+                "五爻": "动于五爻（坎位）：核心球员表现影响全局，或有关键判罚。",
+                "上爻": "动于上爻（兑位）：终局之变，尾声或有绝杀/绝平。"
             }
             desc = dong_detail.get(yname, "动爻需结合全卦。")
         else:
             static_detail = {
-                "初爻": "静于初爻：基础稳定，开局稳健，按部就班。",
-                "二爻": "静于二爻：内部稳定，心态平和，执行力强。",
-                "三爻": "静于三爻：竞争胶着，中段僵持，难以打破平衡。",
-                "四爻": "静于四爻：边路稳定，外援或替补未出奇招。",
-                "五爻": "静于五爻：中枢稳固，核心正常发挥，走势平稳。",
+                "初爻": "静于初爻：基础稳定，开局稳健。",
+                "二爻": "静于二爻：内部稳定，心态平和。",
+                "三爻": "静于三爻：竞争胶着，中段僵持。",
+                "四爻": "静于四爻：边路稳定，外援未出奇招。",
+                "五爻": "静于五爻：中枢稳固，核心正常发挥。",
                 "上爻": "静于上爻：结局平稳，结果与预期一致。"
             }
             desc = static_detail.get(yname, "静爻常规解读。")
@@ -142,7 +175,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     return yao_list
 
 # ============================================================
-# 7. 自动解卦函数
+# 9. 自动解卦函数
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     ping_ju = 0.0
@@ -253,12 +286,12 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     }
 
 # ============================================================
-# 8. 核心预测函数
+# 10. 核心预测函数（仅胜平负）
 # ============================================================
 def poisson_prob(lam, k):
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
 
-def predict_wdl(league_avg, zhan_yi, liu_factors):
+def predict_wdl_only(league_avg, zhan_yi, liu_factors):
     total_goals = league_avg
     lam_h = total_goals * 0.5 * 2
     lam_a = total_goals * 0.5 * 2
@@ -322,79 +355,52 @@ def predict_wdl(league_avg, zhan_yi, liu_factors):
             draw_prob /= total
             lose_prob /= total
 
-    return win_prob * 100, draw_prob * 100, lose_prob * 100, lam_h, lam_a
+    return win_prob, draw_prob, lose_prob, lam_h, lam_a
 
 # ============================================================
-# 9. 生成融合推荐
+# 11. 生成胜平负推荐（三层推演风格）
 # ============================================================
-def generate_fusion_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi):
-    # 综合概率和卦象给出推荐
-    if liu_factors['ping_ju_tend'] > 0.6 and draw_p > 30:
-        recommend = "首选平局，次选客胜"
-        reason = "卦象显示平局倾向极强，概率模型也支持平局"
-    elif win_p > lose_p and win_p > draw_p:
-        recommend = "首选主胜"
-        reason = "主队概率最高，卦象亦显主队占优"
-    elif lose_p > win_p and lose_p > draw_p:
-        recommend = "首选客胜"
-        reason = "客队概率最高，卦象显客队占优"
-    else:
-        recommend = "建议避开，数据胶着"
-        reason = "主客概率接近，卦象无明显指向"
-
-    # 结合战意
-    if zhan_yi >= 1.2:
-        recommend += "（战意强烈，分胜负概率大）"
-    elif zhan_yi <= 0.85:
-        recommend += "（战意不足，需防平局）"
-
-    return recommend, reason
-
-# ============================================================
-# 10. 生成报告（分段优化，手机友好）
-# ============================================================
-def generate_report_sections(home, away, league, match_time, zhan_yi, liu_factors, win_p, draw_p, lose_p):
+def generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi):
     probs = {"主胜": win_p, "平局": draw_p, "客胜": lose_p}
     sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
-    time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
-    confidence = 50 + min(40, (max(win_p, draw_p, lose_p) - 30) * 0.8)
-    confidence = min(90, confidence)
+    # 首推、次推
+    first = sorted_probs[0]
+    second = sorted_probs[1] if len(sorted_probs) > 1 else ("-", 0)
 
-    # 方向
-    if win_p > draw_p and win_p > lose_p:
-        direction = "主胜"
-    elif draw_p > win_p and draw_p > lose_p:
-        direction = "平局"
+    # 战意提示
+    zhan_yi_hint = ""
+    if zhan_yi >= 1.2:
+        zhan_yi_hint = "（战意强烈，分胜负概率大）"
+    elif zhan_yi <= 0.85:
+        zhan_yi_hint = "（战意不足，需防平局）"
+
+    # 卦象修正提示
+    gua_hint = ""
+    if liu_factors['ping_ju_tend'] > 0.6:
+        gua_hint = "卦象平局倾向强"
+    elif liu_factors['zhu_advantage'] > liu_factors['ke_advantage']:
+        gua_hint = "卦象主队占优"
     else:
-        direction = "客胜"
+        gua_hint = "卦象客队占优"
 
-    # 融合推荐
-    fusion_rec, fusion_reason = generate_fusion_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi)
-
-    sections = {
-        "title": f"📊 {home} vs {away}（{league}）",
-        "time": f"🕒 {time_str}",
-        "prob": f"""
-**首推：{sorted_probs[0][0]}（{sorted_probs[0][1]:.1f}%）**  
-**次推：{sorted_probs[1][0]}（{sorted_probs[1][1]:.1f}%）**
-
-主胜 {win_p:.1f}% | 平局 {draw_p:.1f}% | 客胜 {lose_p:.1f}%
-""",
-        "gua": f"""
-平局倾向 {liu_factors['ping_ju_tend']:.2f} | 综合系数 {liu_factors['zong_he']}  
-{liu_factors['analysis'][:80]}
-""",
-        "fusion": f"""
-**推荐：{fusion_rec}**  
-依据：{fusion_reason}
-""",
-        "conf": f"置信度 {confidence:.0f}%"
+    return {
+        "first": first[0],
+        "first_prob": first[1],
+        "second": second[0],
+        "second_prob": second[1],
+        "win": win_p,
+        "draw": draw_p,
+        "lose": lose_p,
+        "zhan_yi_hint": zhan_yi_hint,
+        "gua_hint": gua_hint,
+        "zong_he": liu_factors['zong_he'],
+        "ping_ju_tend": liu_factors['ping_ju_tend'],
+        "analysis": liu_factors['analysis']
     }
-    return sections
 
 # ============================================================
-# 11. 界面布局
+# 12. 界面布局
 # ============================================================
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
@@ -414,19 +420,14 @@ with st.expander("📌 比赛基本信息", expanded=True):
         away_team = st.text_input("请输入客队", value="佛得角")
         match_time = st.datetime_input("比赛时间", value=datetime.now())
 
-zhan_yi_opt = st.selectbox("⚔️ 战意系数", 
-                           [("保级/争冠关键战", 1.4), 
-                            ("淘汰赛", 1.2), 
-                            ("普通联赛", 1.0), 
-                            ("无欲无求", 0.85), 
-                            ("友谊赛", 0.7)],
-                           format_func=lambda x: x[0])
+zhan_yi_opt = st.selectbox("⚔️ 战意系数", ZHAN_YI_LIST, format_func=lambda x: x[0])
 zhan_yi = zhan_yi_opt[1]
 
 # ============================================================
-# 12. 预测按钮
+# 13. 预测按钮
 # ============================================================
 if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
+    # 自动起卦
     zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
     st.session_state.zhu_gua = zhu
     st.session_state.bian_gua = bian
@@ -435,28 +436,63 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
     st.session_state.liu_result = liu_factors
 
     league_avg = LEAGUE_AVG_TOTAL[league]
-    win_p, draw_p, lose_p, lam_h, lam_a = predict_wdl(league_avg, zhan_yi, liu_factors)
+    win_p, draw_p, lose_p, lam_h, lam_a = predict_wdl_only(league_avg, zhan_yi, liu_factors)
+    win_p *= 100
+    draw_p *= 100
+    lose_p *= 100
 
-    sections = generate_report_sections(home_team, away_team, league, match_time, zhan_yi, liu_factors, win_p, draw_p, lose_p)
+    result = generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi)
 
-    # 手机友好分段展示
-    st.subheader(sections["title"])
-    st.caption(sections["time"])
-    st.markdown(sections["prob"])
+    # -------- 显示结果（三层推演风格） --------
     st.markdown("---")
-    st.markdown(f"**卦象贡献**：{sections['gua']}")
-    st.markdown("---")
-    st.markdown(f"**融合推荐**：\n\n{sections['fusion']}")
-    st.markdown("---")
-    st.markdown(f"**模型置信度**：{sections['conf']}")
+    st.markdown(f"### 📊 胜平负预测 —— {home_team} vs {away_team}")
+    st.caption(f"赛事：{league} | 时间：{match_time.strftime('%Y-%m-%d %H:%M') if match_time else '未设置'} | {zhan_yi_opt[0]}")
 
-    with st.expander("🔮 详细卦象解读（含逐爻详解）"):
-        st.write(f"主卦 {zhu} | 变卦 {bian} | 动爻 {dong}")
-        st.write(f"平局倾向 {liu_factors['ping_ju_tend']:.2f}")
-        st.write(f"主队优势 {liu_factors['zhu_advantage']:.2f} | 客队优势 {liu_factors['ke_advantage']:.2f}")
-        st.write(f"综合系数 {liu_factors['zong_he']}")
-        st.write(f"细节：{liu_factors['detail']}")
-        st.write(f"风格：{liu_factors['analysis']}")
+    st.markdown("---")
+
+    # 首推 & 次推（突出显示）
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("🏆 首推", f"{result['first']}", f"{result['first_prob']:.1f}%")
+    with col2:
+        st.metric("🥈 次推", f"{result['second']}", f"{result['second_prob']:.1f}%")
+
+    st.markdown("---")
+
+    # 概率详情（进度条更直观）
+    st.write("**概率详情**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.progress(min(int(result['win']), 100), text=f"主胜 {result['win']:.1f}%")
+    with col2:
+        st.progress(min(int(result['draw']), 100), text=f"平局 {result['draw']:.1f}%")
+    with col3:
+        st.progress(min(int(result['lose']), 100), text=f"客胜 {result['lose']:.1f}%")
+
+    st.markdown("---")
+
+    # 融合推荐
+    if result['first'] == "主胜":
+        fusion_rec = f"首选主胜（{result['first_prob']:.1f}%）"
+    elif result['first'] == "平局":
+        fusion_rec = f"首选平局（{result['first_prob']:.1f}%）"
+    else:
+        fusion_rec = f"首选客胜（{result['first_prob']:.1f}%）"
+
+    st.info(f"💡 **融合推荐**：{fusion_rec}　|　{result['gua_hint']}　|　综合系数 {result['zong_he']:.2f}")
+
+    st.markdown("---")
+    st.caption(f"模型版本：V4.0 胜平负专精版 | 平局倾向 {result['ping_ju_tend']:.2f} | {result['zhan_yi_hint']}")
+
+    # 展开详细卦象
+    with st.expander("🔮 卦象解读（含逐爻详解）"):
+        st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
+        st.write(f"**平局倾向**：{liu_factors['ping_ju_tend']:.2f}")
+        st.write(f"**主队优势系数**：{liu_factors['zhu_advantage']:.2f}")
+        st.write(f"**客队优势系数**：{liu_factors['ke_advantage']:.2f}")
+        st.write(f"**综合系数**：{liu_factors['zong_he']}")
+        st.write(f"**卦象细节**：{liu_factors['detail']}")
+        st.write(f"**风格解读**：{liu_factors['analysis']}")
         st.write("---")
         st.subheader("📜 六爻逐爻详解")
         for yao in liu_factors['yao_details']:
@@ -465,4 +501,4 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
             st.write(f"  - 爻位取象：{yao['爻位取象']}")
             st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 点击「预测胜平负」自动起卦并输出结果 | 含逐爻详解")
+st.caption("💡 点击「预测胜平负」自动起卦并输出 | 基于泊松分布+六爻修正")
