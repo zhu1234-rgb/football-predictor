@@ -302,10 +302,10 @@ if 'liu_result' not in st.session_state:
 with st.expander("📌 比赛基本信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
-        home_team = st.text_input("🏠 主队", value="利物浦")
-        league = st.selectbox("🏆 联赛", list(LEAGUE_AVG_TOTAL.keys()))
+        home_team = st.text_input("请输入主队", value="利物浦")
+        league = st.selectbox("请选择赛程", list(LEAGUE_AVG_TOTAL.keys()))
     with col2:
-        away_team = st.text_input("✈️ 客队", value="曼城")
+        away_team = st.text_input("请输入客队", value="曼城")
 
 with st.expander("📊 核心数据", expanded=True):
     col1, col2 = st.columns(2)
@@ -329,7 +329,7 @@ with st.expander("🔮 六爻参数（自动起卦）", expanded=False):
     # 显示当前卦象信息（只读）
     st.write(f"**主卦**: {st.session_state.zhu_gua}　|　**变卦**: {st.session_state.bian_gua}　|　**动爻**: {st.session_state.dong_yao}")
 
-    # 战意系数（仍保留手动选择）
+    # 战意系数
     zhan_yi_opt = st.selectbox("战意系数", [("保级/争冠",1.4),("淘汰赛",1.2),("普通联赛",1.0),("无欲无求",0.85),("友谊赛",0.7)],
                                format_func=lambda x: x[0])
     zhan_yi = zhan_yi_opt[1]
