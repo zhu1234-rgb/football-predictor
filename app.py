@@ -7,7 +7,7 @@ import hashlib
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·足球预测", layout="centered", initial_sidebar_state="collapsed")
 st.title("⚽ 六爻 · 足球预测引擎")
-st.caption("输入Elo + 六爻参数，自动解卦融合二十八法")
+st.caption("输入Elo + 必发指数，自动起卦解卦融合二十八法")
 
 # ============================================================
 # 2. 知识库模块
@@ -109,7 +109,7 @@ def auto_gua_by_teams(home, away):
     seed = int(hex_digest[:8], 16)
     zhu_index = seed % 64
     bian_index = (seed // 64) % 64
-    dong_index = seed % 6  # 0~5 对应初爻~上爻，但我们映射到列表索引
+    dong_index = seed % 6  # 0~5 对应初爻~上爻
     dong_yao_list = ["初爻","二爻","三爻","四爻","五爻","上爻"]
     dong_yao = dong_yao_list[dong_index]
     return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
@@ -289,7 +289,7 @@ def knowledge_query_ui():
 # ============================================================
 # 9. 界面布局与主程序
 # ============================================================
-# 初始化session_state（卦象选择值）
+# 初始化session_state
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
 if 'bian_gua' not in st.session_state:
@@ -316,38 +316,25 @@ with st.expander("📊 核心数据", expanded=True):
         bf_small = st.number_input("📉 必发小球指数", 0, 100, 45)
         elo_away = st.number_input("📊 客队Elo", 1000, 2500, 1850, 10)
 
-with st.expander("🔮 六爻参数", expanded=False):
+with st.expander("🔮 六爻参数（自动起卦）", expanded=False):
     # 自动起卦按钮
     if st.button("🔄 根据队名自动起卦", use_container_width=True):
         zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
         st.session_state.zhu_gua = zhu
         st.session_state.bian_gua = bian
         st.session_state.dong_yao = dong
-        # 自动解卦
         st.session_state.liu_result = auto_jie_gua(zhu, bian, dong)
         st.success(f"起卦完成：主卦 {zhu}，变卦 {bian}，{dong}")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        zhu_gua = st.selectbox("主卦", GUA_LIST, index=GUA_LIST.index(st.session_state.zhu_gua), key="zhu_gua_select")
-        st.session_state.zhu_gua = zhu_gua
-        dong_yao = st.selectbox("动爻位置", ["无动爻","初爻","二爻","三爻","四爻","五爻","上爻"],
-                                index=["无动爻","初爻","二爻","三爻","四爻","五爻","上爻"].index(st.session_state.dong_yao),
-                                key="dong_yao_select")
-        st.session_state.dong_yao = dong_yao
-    with col2:
-        bian_gua = st.selectbox("变卦", GUA_LIST, index=GUA_LIST.index(st.session_state.bian_gua), key="bian_gua_select")
-        st.session_state.bian_gua = bian_gua
-        zhan_yi_opt = st.selectbox("战意系数", [("保级/争冠",1.4),("淘汰赛",1.2),("普通联赛",1.0),("无欲无求",0.85),("友谊赛",0.7)],
-                                   format_func=lambda x: x[0])
-        zhan_yi = zhan_yi_opt[1]
+    # 显示当前卦象信息（只读）
+    st.write(f"**主卦**: {st.session_state.zhu_gua}　|　**变卦**: {st.session_state.bian_gua}　|　**动爻**: {st.session_state.dong_yao}")
 
-    # 每次选择改变时自动重新解卦（但只有在点击"解卦"或"自动起卦"时才更新结果，这里我们保持手动触发）
-    # 所以增加一个"解卦"按钮
-    if st.button("🔄 解卦", use_container_width=True):
-        st.session_state.liu_result = auto_jie_gua(st.session_state.zhu_gua, st.session_state.bian_gua, st.session_state.dong_yao)
-        st.success("解卦完成")
+    # 战意系数（仍保留手动选择）
+    zhan_yi_opt = st.selectbox("战意系数", [("保级/争冠",1.4),("淘汰赛",1.2),("普通联赛",1.0),("无欲无求",0.85),("友谊赛",0.7)],
+                               format_func=lambda x: x[0])
+    zhan_yi = zhan_yi_opt[1]
 
+    # 显示解卦结果
     liu = st.session_state.liu_result
     st.write(f"**综合系数**: `{liu['zong_he']}`")
     st.write(f"**平局倾向**: {liu['ping_ju_tend']:.2f} | **主队优势**: {liu['zhu_advantage']:.2f} | **客队优势**: {liu['ke_advantage']:.2f}")
@@ -401,4 +388,4 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
         st.write(f"综合系数: {liu_factors['zong_he']}")
         st.caption(liu_factors['detail'])
 
-st.caption("💡 点击「根据队名自动起卦」可快速生成卦象，也可手动调整。")
+st.caption("💡 点击「根据队名自动起卦」生成卦象，然后点击「开始预测」")
