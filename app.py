@@ -1,134 +1,112 @@
+import streamlit as st
 import requests
 import math
-from datetime import datetime
+import json
 
-# ============ 配置区 ============
-API_KEY = "YOUR_API_KEY"  # 替换成你免费申请的Key
-API_URL = "https://v3.football.api-sports.io"
+# ============ 页面配置 ============
+st.set_page_config(page_title="足球预测神器", layout="centered")
+st.title("⚽ 足球预测引擎 (网页输入版)")
+st.caption("专为 Streamlit 优化，解决空白页问题 | 数据源：API-Football")
 
-# ============ 1. 自动抓取初盘 & 变盘（替代手动输入） ============
-def get_odds_and_alerts(fixture_id):
-    """输入比赛ID，自动返回初盘、变盘，并计算是否触发预警"""
-    headers = {"x-rapidapi-key": API_KEY}
+# ============ 侧边栏：免费API配置 ============
+with st.sidebar:
+    st.header("🔑 数据源配置")
+    api_key = st.text_input("输入你的 API-Football Key", type="password", help="免费版每天100次请求")
+    fixture_id = st.number_input("比赛ID (Fixture ID)", min_value=1, value=123456, step=1)
     
-    # 获取赔率数据（包含初盘和即时盘）
-    resp = requests.get(f"{API_URL}/odds", headers=headers, params={"fixture": fixture_id})
-    data = resp.json()
+    st.divider()
+    st.header("📊 手动输入核心数据")
+    # 必发指数（替代input()）
+    bf_big = st.slider("必发大球指数", 0, 100, 55)
+    bf_small = st.slider("必发小球指数", 0, 100, 45)
     
-    if not data["response"]:
-        return None
+    # 六爻量化
+    moving_yao = st.selectbox("动爻力量 (1-9)", [1,2,3,4,5,6,7,8,9], index=4)
+    gua_score = st.slider("主卦对主队评分 (-5凶 到 +5吉)", -5, 5, 0)
     
-    # 取第一个博彩公司（如Bet365）的数据
-    bookie = data["response"][0]["bookmakers"][0]
-    bets = bookie["bets"][0]["values"]  # 胜平负
+    # xG 预期进球
+    xg_home = st.number_input("主队xG", min_value=0.0, max_value=5.0, value=1.8, step=0.1)
+    xg_away = st.number_input("客队xG", min_value=0.0, max_value=5.0, value=1.2, step=0.1)
     
-    initial = {}  # 初盘
-    current = {}  # 变盘（即时）
-    for item in bets:
-        value = item["value"]
-        if "odd" in item:  # 初盘
-            initial[value] = float(item["odd"])
-        if "odd" in item:  # 实际上API结构需按返回调整，这里简化逻辑
-            pass 
-    
-    # 由于免费API结构差异，实战中建议直接取"主胜"索引
-    # 这里演示手动模拟数据（实际运行请根据打印的JSON结构调整）
-    print("⚠️ 免费API的赔率结构较深，建议先用下面手动输入兜底")
-    return {"initial": [1.80, 3.50, 4.00], "current": [1.65, 3.80, 4.50]}
+    # 战意系数
+    zhan_yi = st.selectbox("战意系数", [0.8, 0.9, 1.0, 1.2, 1.4], index=2, help="保级/争冠选1.4，无欲无求选0.8")
 
-def check_alert(initial, current):
-    """变盘预警：胜平负任一降幅超过0.2即报警"""
-    alerts = []
-    for i, label in enumerate(["主胜", "平局", "客胜"]):
-        if initial[i] - current[i] > 0.2:
-            alerts.append(f"⚠️ {label}急剧下降 {initial[i]-current[i]:.2f}，热钱涌入！")
-    return alerts
-
-# ============ 2. 手动输入模块（必发指数 + 六爻 + 大小球） ============
-def manual_inputs():
-    print("\n--- 请手动输入以下核心数据 ---")
-    bf_big = float(input("必发大球指数 (0-100): "))
-    bf_small = float(input("必发小球指数 (0-100): "))
-    
-    # 六爻量化：动爻能量（用户自己填，1-9）
-    moving_yao = int(input("动爻数字 (1-9, 代表力量): "))
-    # 卦象生克：主卦评分（-5到+5），影响主队士气
-    gua_score = float(input("主卦对主队评分 (-5 极凶 到 +5 极吉): "))
-    
-    # 手动xG（预期进球）
-    xg_home = float(input("主队xG (如1.8): "))
-    xg_away = float(input("客队xG (如1.2): "))
-    
-    return bf_big, bf_small, moving_yao, gua_score, xg_home, xg_away
-
-# ============ 3. 核心算法：泊松分布 + ELO修正 + 战意 ============
+# ============ 核心函数 ============
 def poisson_prob(lam, k):
-    """计算泊松分布概率（进球k个的概率）"""
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
 
-def predict_score(xg_h, xg_a, yizhang_factor, gua_factor, bf_big):
-    """预测具体比分"""
-    # 战意系数（用户可改，这里默认1.0）
-    zhan_yi = 1.0  
-    # 必发大球指数高于65，调高进球预期
+def fetch_odds(api_key, fid):
+    if not api_key:
+        return None
+    headers = {"x-rapidapi-key": api_key}
+    try:
+        resp = requests.get(f"https://v3.football.api-sports.io/odds", 
+                            headers=headers, 
+                            params={"fixture": fid},
+                            timeout=10)
+        data = resp.json()
+        if data.get("response"):
+            # 简易解析，取第一个盘口
+            return {"status": "ok", "data": data["response"][0]}
+        else:
+            return {"status": "error", "msg": "无数据或ID错误"}
+    except Exception as e:
+        return {"status": "error", "msg": str(e)}
+
+def predict_score(xg_h, xg_a, zhan_yi, gua_score, moving_yao, bf_big):
+    # 必发修正
     if bf_big > 65:
         xg_h *= 1.15
         xg_a *= 1.15
-    # 六爻卦象影响（动爻+卦评分转化为波动）
-    yao_effect = 1 + (moving_yao / 10) * 0.05
-    gua_effect = 1 + (gua_score / 50)  # -5分变0.9，+5变1.1
+    # 六爻修正
+    yao_effect = 1 + (int(moving_yao) / 10) * 0.05
+    gua_effect = 1 + (gua_score / 50)
     
-    lam_h = xg_h * yizhang_factor * yao_effect * gua_effect
-    lam_a = xg_a * yizhang_factor * yao_effect * (1/gua_effect)  # 客队反着来
+    lam_h = xg_h * zhan_yi * yao_effect * gua_effect
+    lam_a = xg_a * zhan_yi * yao_effect * (1 / max(gua_effect, 0.1))
     
-    # 计算最高概率比分 (0-4球)
     scores = {}
     for i in range(5):
         for j in range(5):
             prob = poisson_prob(lam_h, i) * poisson_prob(lam_a, j)
-            scores[f"{i}-{j}"] = prob * 100  # 转百分比
-    
-    # 排序取前5
+            scores[f"{i}-{j}"] = prob * 100
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:5]
     return sorted_scores, lam_h, lam_a
 
-# ============ 4. 凯利公式（评估庄家风险） ============
-def kelly_calc(odds, prob):
-    """odds: 当前赔率, prob: 你预测的真实概率(0-1)"""
-    return (odds * prob - (1 - prob)) / odds
-
-# ============ 5. 主程序执行 ============
-if __name__ == "__main__":
-    print("⚽ 足球预测引擎启动 (手机版) ⚽")
-    
-    # 第一步：免费API拉取（因手机网络限制，这里用模拟数据演示）
-    print("\n【自动拉取初盘/变盘】")
-    odds_data = get_odds_and_alerts(123456)  # 123456替换为真实比赛ID
-    if odds_data:
-        alerts = check_alert(odds_data["initial"], odds_data["current"])
-        for a in alerts:
-            print(a)
+# ============ 主按钮与结果展示 ============
+if st.button("🚀 开始预测", type="primary"):
+    # 1. 拉取数据
+    if api_key:
+        with st.spinner("正在拉取初盘/变盘数据..."):
+            result = fetch_odds(api_key, fixture_id)
+            if result and result.get("status") == "ok":
+                st.success("✅ API数据拉取成功")
+                st.json(result["data"])  # 展示原始数据供参考
+            else:
+                st.warning(f"⚠️ API错误：{result.get('msg', '未知错误')}，将跳过自动预警")
     else:
-        print("📵 API未响应，请检查网络或Key，手动输入初盘兜底：")
-        init_odds = input("输入初盘 主胜 平 客胜 (空格分隔): ").split()
-        curr_odds = input("输入变盘 主胜 平 客胜 (空格分隔): ").split()
+        st.info("未输入API Key，跳过自动抓取，仅使用手动数据计算")
     
-    # 第二步：手动输入核心指标
-    bf_big, bf_small, moving_yao, gua_score, xg_h, xg_a = manual_inputs()
+    # 2. 执行预测
+    top_scores, lam_h, lam_a = predict_score(xg_home, xg_away, zhan_yi, gua_score, moving_yao, bf_big)
     
-    # 第三步：比分预测
-    print("\n【预测结果】")
-    top_scores, lam_h, lam_a = predict_score(xg_h, xg_a, 1.0, gua_score, bf_big)
-    print(f"主队预期进球 λ = {lam_h:.2f}, 客队 λ = {lam_a:.2f}")
-    print("最可能的比分预测 (概率%)：")
+    # 3. 显示结果
+    st.subheader("📈 预测结果")
+    col1, col2 = st.columns(2)
+    col1.metric("主队预期进球 λ", f"{lam_h:.2f}")
+    col2.metric("客队预期进球 λ", f"{lam_a:.2f}")
+    
+    st.subheader("🏆 最可能比分 (概率%)")
     for score, prob in top_scores:
-        print(f"  {score}  ->  {prob:.2f}%")
+        st.progress(min(int(prob), 100), text=f"{score}  ->  {prob:.2f}%")
     
-    # 第四步：凯利风控（假设当前主胜赔率为1.8）
-    kelly_val = kelly_calc(1.8, top_scores[0][1]/100)
-    if kelly_val > 0.8:
-        print(f"🚨 凯利值高达 {kelly_val:.2f}，庄家赔付风险极大，建议反买！")
-    else:
-        print(f"✅ 凯利值 {kelly_val:.2f}，处于安全区间。")
-    
-    print("\n✅ 预测完成！下次直接修改上面的API_KEY即可。")
+    # 4. 凯利简易计算
+    if top_scores:
+        kelly_val = (1.8 * (top_scores[0][1]/100) - (1 - top_scores[0][1]/100)) / 1.8
+        if kelly_val > 0.8:
+            st.error(f"🚨 凯利值 {kelly_val:.2f}，风险极高！")
+        else:
+            st.success(f"✅ 凯利值 {kelly_val:.2f}，状态平稳。")
+
+st.divider()
+st.caption("💡 提示：免费API每天限100次，若空白请检查Key或改用纯手动模式（不填Key即可）")
