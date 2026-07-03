@@ -1,15 +1,14 @@
 import streamlit as st
 import requests
 import math
-import json
 from datetime import datetime
 
 # ============================================================
-# 1. 页面配置（手机优先）
+# 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 足球预测全能版", layout="centered", initial_sidebar_state="expanded")
-st.title("⚽ 足球预测引擎 · 全能版")
-st.caption("集成：必发指数 | 六爻纳甲 | 泊松分布 | ELO | xG | 凯利公式 | 变盘预警")
+st.set_page_config(page_title="⚽ 六爻·足球预测", layout="centered", initial_sidebar_state="expanded")
+st.title("⚽ 六爻纳甲 · 足球预测引擎")
+st.caption("融合京房纳甲、野鹤实战、黄金策、28断法 | 支持五大联赛、日韩、世界杯")
 
 # ============================================================
 # 2. 侧边栏：所有输入参数
@@ -18,38 +17,76 @@ with st.sidebar:
     st.header("📌 比赛基本信息")
     home_team = st.text_input("🏠 主队名称", value="利物浦")
     away_team = st.text_input("✈️ 客队名称", value="曼城")
-    
+    league = st.selectbox("🏆 联赛/赛事", ["英超", "西甲", "德甲", "意甲", "法甲", "日职", "K联赛", "世界杯"])
+
     st.divider()
     st.header("📊 核心数据（手动输入）")
     bf_big = st.number_input("📈 必发大球指数 (0-100)", min_value=0, max_value=100, value=55, step=1)
     bf_small = st.number_input("📉 必发小球指数 (0-100)", min_value=0, max_value=100, value=45, step=1)
-    
     xg_home = st.number_input("⚽ 主队xG (预期进球)", min_value=0.0, max_value=5.0, value=1.8, step=0.1)
     xg_away = st.number_input("⚽ 客队xG (预期进球)", min_value=0.0, max_value=5.0, value=1.2, step=0.1)
-    
     elo_home = st.number_input("📊 主队ELO评分", min_value=1000, max_value=2500, value=1900, step=10)
     elo_away = st.number_input("📊 客队ELO评分", min_value=1000, max_value=2500, value=1850, step=10)
-    
+
     st.divider()
-    st.header("🔮 玄学参数（六爻）")
-    gua_name = st.selectbox("主卦名称", ["乾", "坤", "震", "巽", "坎", "离", "艮", "兑", "其他"])
-    moving_yao = st.selectbox("动爻位置 (初爻至上爻)", ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"], index=2)
-    gua_score = st.slider("主卦对主队影响 (-5凶 ~ +5吉)", -5, 5, 0, step=1)
+    st.header("🔮 六爻参数（二十八法量化）")
     
+    # ---- 用神定位 ----
+    st.subheader("① 用神定位")
+    yong_shen = st.selectbox("取用神", ["世应（主客实力）", "子孙（进球）", "妻财（收益）", "官鬼（裁判/防守）", "兄弟（竞争）"])
+    # 转换为系数影响
+    yong_shen_factor = {"世应（主客实力）": 1.0, "子孙（进球）": 1.2, "妻财（收益）": 0.9, "官鬼（裁判/防守）": 0.8, "兄弟（竞争）": 0.7}.get(yong_shen, 1.0)
+    
+    # ---- 世应主客 ----
+    shi_ying = st.selectbox("世应关系", ["世克应（主胜）", "应克世（客胜）", "世生应（主让）", "应生世（客让）", "比和（平局）"])
+    shi_ying_map = {"世克应（主胜）": 1.15, "应克世（客胜）": 0.85, "世生应（主让）": 0.95, "应生世（客让）": 1.05, "比和（平局）": 1.0}
+    shi_ying_coef = shi_ying_map[shi_ying]
+    
+    # ---- 六冲六合 ----
+    liu_chong_he = st.selectbox("卦局", ["六冲（快速分胜负）", "六合（僵持拉锯）", "无特殊"])
+    liu_chong_he_map = {"六冲（快速分胜负）": 1.2, "六合（僵持拉锯）": 0.8, "无特殊": 1.0}
+    liu_coef = liu_chong_he_map[liu_chong_he]
+    
+    # ---- 空亡 ----
+    kong_wang = st.selectbox("用神空亡", ["无空亡", "假空（出空应验）", "真空（事难成）"])
+    kong_wang_map = {"无空亡": 1.0, "假空（出空应验）": 0.9, "真空（事难成）": 0.6}
+    kong_coef = kong_wang_map[kong_wang]
+    
+    # ---- 三合局 ----
+    san_he = st.selectbox("三合局", ["无", "子孙局（大球）", "官鬼局（小球）", "财局（收益）"])
+    san_he_map = {"无": 1.0, "子孙局（大球）": 1.25, "官鬼局（小球）": 0.75, "财局（收益）": 1.0}
+    san_he_coef = san_he_map[san_he]
+    
+    # ---- 反吟伏吟 ----
+    fan_yin = st.selectbox("卦象反复", ["无", "伏吟（拉锯反复）", "反吟（局势逆转）"])
+    fan_yin_map = {"无": 1.0, "伏吟（拉锯反复）": 0.9, "反吟（局势逆转）": 1.3}
+    fan_yin_coef = fan_yin_map[fan_yin]
+    
+    # ---- 六神主象 ----
+    liu_shen = st.selectbox("六神主象", ["青龙（顺攻）", "白虎（强攻）", "朱雀（波动）", "腾蛇（变数）", "勾陈（僵持）", "玄武（偷袭）"])
+    liu_shen_map = {"青龙（顺攻）": 1.1, "白虎（强攻）": 1.2, "朱雀（波动）": 1.0, "腾蛇（变数）": 1.15, "勾陈（僵持）": 0.8, "玄武（偷袭）": 0.9}
+    liu_shen_coef = liu_shen_map[liu_shen]
+    
+    # ---- 用神旺衰 ----
+    wang_shuai = st.selectbox("用神旺衰", ["旺", "相", "休", "囚", "死"])
+    wang_shuai_map = {"旺": 1.3, "相": 1.1, "休": 1.0, "囚": 0.8, "死": 0.6}
+    wang_shuai_coef = wang_shuai_map[wang_shuai]
+    
+    # ---- 综合爻位动变 ----
+    moving_yao = st.selectbox("动爻位置", ["无动爻", "初爻", "二爻", "三爻", "四爻", "五爻", "上爻", "多动"])
+    yao_effect = {"无动爻":1.0, "初爻":0.8, "二爻":0.9, "三爻":1.0, "四爻":1.1, "五爻":1.15, "上爻":1.2, "多动":1.05}.get(moving_yao, 1.0)
+
     st.divider()
     st.header("⚔️ 战意系数")
     zhan_yi = st.selectbox("比赛阶段战意", 
                            options=[("保级/争冠关键战", 1.4), ("淘汰赛", 1.2), ("普通联赛", 1.0), ("无欲无求", 0.85), ("友谊赛", 0.7)],
                            format_func=lambda x: x[0])
     zhan_yi_value = zhan_yi[1]
-    
+
     st.divider()
     st.header("🌐 数据源（可选）")
     api_key = st.text_input("API-Football Key (免费)", type="password", help="不填则纯手动模式")
     fixture_id = st.number_input("比赛ID (用于自动抓取)", min_value=1, value=123456, step=1)
-    
-    st.divider()
-    st.header("📉 手动初盘/变盘 (兜底)")
     use_manual_odds = st.checkbox("手动输入赔率 (否则尝试自动抓取)")
     if use_manual_odds:
         col1, col2, col3 = st.columns(3)
@@ -71,11 +108,9 @@ with st.sidebar:
 # 3. 核心算法函数
 # ============================================================
 def poisson_prob(lam, k):
-    """泊松分布概率"""
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
 
 def fetch_odds_from_api(api_key, fixture_id):
-    """尝试从API获取初盘与变盘"""
     if not api_key:
         return None, None
     headers = {"x-rapidapi-key": api_key}
@@ -85,28 +120,21 @@ def fetch_odds_from_api(api_key, fixture_id):
                             params={"fixture": fixture_id}, timeout=8)
         data = resp.json()
         if data.get("response"):
-            # 取第一家博彩公司的胜平负数据（简化处理）
             bookie = data["response"][0]["bookmakers"][0]
-            bets = bookie["bets"][0]["values"]  # 通常第一个是"Match Winner"
-            # 构建初盘和变盘列表（索引0主胜，1平局，2客胜）
-            # 注意：实际API返回结构可能不同，这里做健壮处理
+            bets = bookie["bets"][0]["values"]
             initial = []
             current = []
             for item in bets:
                 if "value" in item:
-                    # 这里假设"value"为 "Home", "Draw", "Away"
                     if item["value"] == "Home":
                         initial.append(float(item.get("odd", 1.80)))
                     elif item["value"] == "Draw":
                         initial.append(float(item.get("odd", 3.50)))
                     elif item["value"] == "Away":
                         initial.append(float(item.get("odd", 4.00)))
-            # 如果没有找到，用默认值
             if len(initial) != 3:
                 return None, None
-            # 变盘同样方式（实际上不同时间点，但免费版难获取历史，这里用当前赔率作为变盘）
-            # 简单起见，将当前赔率作为变盘（实际中可用另一个接口）
-            current = initial  # 演示，实际项目应获取即时赔率
+            current = initial  # 简化，实际应用应获取即时赔率
             return initial, current
         else:
             return None, None
@@ -114,7 +142,6 @@ def fetch_odds_from_api(api_key, fixture_id):
         return None, None
 
 def check_alert(initial, current):
-    """变盘预警：任一赔率降幅 > 0.2 触发报警"""
     alerts = []
     labels = ["主胜", "平局", "客胜"]
     if initial and current:
@@ -124,14 +151,17 @@ def check_alert(initial, current):
                 alerts.append(f"⚠️ {labels[i]} 赔率骤降 {drop:.2f} (初盘 {initial[i]:.2f} → 现盘 {current[i]:.2f})")
     return alerts
 
-def predict_scores(xg_h, xg_a, elo_h, elo_a, zhan_yi, gua_score, moving_yao, bf_big, bf_small):
-    """核心预测：返回前5比分及概率，以及λ值"""
-    # 1. ELO修正：将ELO转换为进球因子（双方ELO差影响）
+def predict_scores(xg_h, xg_a, elo_h, elo_a, zhan_yi, 
+                   shi_ying_coef, liu_coef, kong_coef, san_he_coef, 
+                   fan_yin_coef, liu_shen_coef, wang_shuai_coef, 
+                   yao_effect, yong_shen_factor, bf_big, bf_small):
+    """融合六爻二十八法的预测模型"""
+    # 1. ELO修正
     elo_diff = elo_h - elo_a
-    elo_factor_h = 1 + (elo_diff / 400) * 0.1   # 每差100分影响约2.5%
+    elo_factor_h = 1 + (elo_diff / 400) * 0.1
     elo_factor_a = 1 - (elo_diff / 400) * 0.1
-    
-    # 2. 必发大小球修正
+
+    # 2. 必发修正
     if bf_big > 65 and bf_small < 35:
         xg_h *= 1.2
         xg_a *= 1.2
@@ -141,19 +171,16 @@ def predict_scores(xg_h, xg_a, elo_h, elo_a, zhan_yi, gua_score, moving_yao, bf_
     elif bf_small > 60 and bf_big < 40:
         xg_h *= 0.9
         xg_a *= 0.9
+
+    # 3. 六爻二十八法综合系数（乘积作用于λ）
+    liu_yao_factor = (shi_ying_coef * liu_coef * kong_coef * san_he_coef * 
+                      fan_yin_coef * liu_shen_coef * wang_shuai_coef * yao_effect * yong_shen_factor)
     
-    # 3. 六爻量化（动爻位置影响波动性）
-    # 将爻位转为系数（初爻~上爻 对应0.8~1.2）
-    yao_map = {"初爻":0.8, "二爻":0.9, "三爻":1.0, "四爻":1.1, "五爻":1.15, "上爻":1.2}
-    yao_effect = yao_map.get(moving_yao, 1.0)
-    # 卦评分影响
-    gua_effect = 1 + (gua_score / 50)  # -5 => 0.9, +5 => 1.1
-    
-    # 4. 计算预期进球λ
-    lam_h = xg_h * elo_factor_h * zhan_yi * yao_effect * gua_effect
-    lam_a = xg_a * elo_factor_a * zhan_yi * yao_effect * (1 / max(gua_effect, 0.1))
-    
-    # 5. 泊松分布计算0~4球的所有组合
+    # 4. 主客队分别应用（主队用全系数，客队用部分反向）
+    lam_h = xg_h * elo_factor_h * zhan_yi * liu_yao_factor
+    lam_a = xg_a * elo_factor_a * zhan_yi * (1 / max(liu_yao_factor, 0.1))
+
+    # 5. 泊松分布
     scores = {}
     for i in range(5):
         for j in range(5):
@@ -163,16 +190,15 @@ def predict_scores(xg_h, xg_a, elo_h, elo_a, zhan_yi, gua_score, moving_yao, bf_
     return sorted_scores, lam_h, lam_a
 
 def kelly_calc(odds, prob):
-    """凯利值计算 (odds为当前赔率, prob为预测概率0-1)"""
     if odds <= 1:
         return 0
     return (odds * prob - (1 - prob)) / odds
 
 # ============================================================
-# 4. 主界面：预测按钮及结果显示
+# 4. 主界面
 # ============================================================
 if st.button("🚀 开始预测", type="primary", use_container_width=True):
-    # ---- 4.1 获取赔率数据（自动或手动） ----
+    # 获取赔率
     initial, current = None, None
     if api_key and not use_manual_odds:
         with st.spinner("正在拉取实时赔率数据..."):
@@ -180,21 +206,19 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
             if initial:
                 st.success("✅ 自动获取赔率成功")
             else:
-                st.warning("⚠️ 自动获取失败，请检查API Key或比赛ID，或启用'手动输入赔率'")
-                # 使用默认值继续
+                st.warning("⚠️ 自动获取失败，使用默认赔率")
                 initial = [1.80, 3.50, 4.00]
-                current = [1.75, 3.60, 4.20]
+                current = [1.80, 3.50, 4.00]
     elif use_manual_odds and initial_odds:
         initial = initial_odds
         current = current_odds
         st.info("📝 使用手动输入的赔率")
     else:
-        # 默认赔率（无数据）
         initial = [1.80, 3.50, 4.00]
         current = [1.80, 3.50, 4.00]
         st.info("📝 使用默认赔率（无变盘预警）")
-    
-    # ---- 4.2 变盘预警 ----
+
+    # 变盘预警
     if initial and current:
         alerts = check_alert(initial, current)
         if alerts:
@@ -203,46 +227,50 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
                 st.warning(a)
         else:
             st.success("✅ 无剧烈变盘，数据平稳")
-    
-    # ---- 4.3 执行比分预测 ----
+
+    # 预测
     top_scores, lam_h, lam_a = predict_scores(
-        xg_home, xg_away, elo_home, elo_away, zhan_yi_value, 
-        gua_score, moving_yao, bf_big, bf_small
+        xg_home, xg_away, elo_home, elo_away, zhan_yi_value,
+        shi_ying_coef, liu_coef, kong_coef, san_he_coef,
+        fan_yin_coef, liu_shen_coef, wang_shuai_coef,
+        yao_effect, yong_shen_factor, bf_big, bf_small
     )
-    
-    # ---- 4.4 显示预测结果 ----
+
+    # 显示结果
     st.subheader(f"📊 {home_team} vs {away_team} 预测详情")
     col1, col2 = st.columns(2)
     col1.metric(f"{home_team} 预期进球 λ", f"{lam_h:.2f}")
     col2.metric(f"{away_team} 预期进球 λ", f"{lam_a:.2f}")
-    
+
     st.subheader("🏆 最可能比分 (概率%)")
     for score, prob in top_scores:
         st.progress(min(int(prob), 100), text=f"{score}  →  {prob:.2f}%")
-    
-    # ---- 4.5 凯利公式计算（基于最高概率比分） ----
+
+    # 凯利
     if top_scores:
         max_prob = top_scores[0][1] / 100
-        # 选取当前主胜赔率（假设为current[0]）
         current_win_odds = current[0] if current and len(current)>0 else 1.80
         kelly_val = kelly_calc(current_win_odds, max_prob)
         st.subheader("💰 凯利风控指标")
         if kelly_val > 0.7:
-            st.error(f"🚨 凯利值 {kelly_val:.2f}，庄家赔付风险高，建议谨慎！")
+            st.error(f"🚨 凯利值 {kelly_val:.2f}，庄家赔付风险高！")
         elif kelly_val > 0.4:
             st.warning(f"⚠️ 凯利值 {kelly_val:.2f}，存在一定风险")
         else:
             st.success(f"✅ 凯利值 {kelly_val:.2f}，模型信心稳定")
-        
-        # 显示当前的赔率信息
-        st.caption(f"当前主胜赔率: {current_win_odds:.2f} | 预测主胜概率: {max_prob*100:.1f}%")
-    
-    # ---- 4.6 额外信息：ELO和战意 ----
-    with st.expander("📌 参数详情"):
-        st.write(f"**ELO差**: {elo_home - elo_away} 分")
-        st.write(f"**战意系数**: {zhan_yi_value}")
-        st.write(f"**六爻**: {gua_name} / {moving_yao} / 卦评分 {gua_score}")
-        st.write(f"**必发指数**: 大球 {bf_big} / 小球 {bf_small}")
+
+    # 显示六爻参数摘要
+    with st.expander("🔮 六爻参数摘要（二十八法量化）"):
+        st.write(f"- **用神**：{yong_shen}（系数 {yong_shen_factor:.2f}）")
+        st.write(f"- **世应**：{shi_ying}（系数 {shi_ying_coef:.2f}）")
+        st.write(f"- **卦局**：{liu_chong_he}（系数 {liu_coef:.2f}）")
+        st.write(f"- **空亡**：{kong_wang}（系数 {kong_coef:.2f}）")
+        st.write(f"- **三合**：{san_he}（系数 {san_he_coef:.2f}）")
+        st.write(f"- **反吟/伏吟**：{fan_yin}（系数 {fan_yin_coef:.2f}）")
+        st.write(f"- **六神**：{liu_shen}（系数 {liu_shen_coef:.2f}）")
+        st.write(f"- **旺衰**：{wang_shuai}（系数 {wang_shuai_coef:.2f}）")
+        st.write(f"- **动爻**：{moving_yao}（系数 {yao_effect:.2f}）")
+        st.write(f"**综合六爻因子**：{shi_ying_coef * liu_coef * kong_coef * san_he_coef * fan_yin_coef * liu_shen_coef * wang_shuai_coef * yao_effect * yong_shen_factor:.2f}")
 
 st.divider()
-st.caption("💡 提示：所有参数均在左侧边栏调整，点击预测即可刷新结果。")
+st.caption("💡 左侧边栏调整六爻参数，融合二十八断法，点击预测即得结果。")
