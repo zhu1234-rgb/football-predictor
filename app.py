@@ -1,16 +1,17 @@
 import streamlit as st
 import math
 import hashlib
+from datetime import datetime
 
 # ============================================================
 # 1. 页面配置
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·胜平负预测", layout="centered", initial_sidebar_state="collapsed")
 st.title("⚽ 六爻 · 胜平负预测引擎")
-st.caption("融合《春秋太卜》《六爻心源》取象法 | 输入Elo + 必发指数，自动起卦解卦")
+st.caption("融合《春秋太卜》《六爻心源》取象法 | 输入Elo + 必发指数，自动起卦解卦 | 含逐爻详解")
 
 # ============================================================
-# 2. 知识库（书籍核心取象，用于卦象解读）
+# 2. 卦象数据（用于报告解读和逐爻分析）
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行":"金","人物":"领导、父亲、冠军","场所":"京都","方位":"西北","数字":"1,6","动物":"马","静物":"金玉","人体":"头","颜色":"白","五味":"辛","比赛":"冠军、强势方、大胜"},
@@ -23,25 +24,23 @@ GUA_LEI_XIANG = {
     "兑": {"五行":"金","人物":"少女、歌手、边锋","场所":"沼泽","方位":"西","数字":"2,7","动物":"羊","静物":"刀","人体":"口","颜色":"白","五味":"辛","比赛":"边路突破、点球决胜"}
 }
 
-# 二十八法核心断语（比赛专用）
-ER_SHI_BA_FA = {
-    "六合卦": "平局倾向高，双方保守，总进球≤3",
-    "归魂卦": "胶着反复，平局或一球小胜",
-    "游魂卦": "客队不败或爆冷",
-    "六冲卦": "分胜负，不轻易判平",
-    "体克用": "主胜（主队克制客队）",
-    "用克体": "客胜（客队克制主队）",
-    "体用比和": "平局（双方势均力敌）",
-    "世应相生": "主客和谐，平局或主不败",
-    "世应相克": "分胜负，对抗激烈",
-    "过旺应凶": "大热必死，热门方不胜",
-    "过衰应吉": "哀兵必胜，冷门方不败",
-    "乾为冠军": "乾卦出现或主事，冠军倾向",
-    "兑为伤病": "兑卦受伤，核心球员伤病",
-    "震为新星": "震卦发动，新星爆发",
-    "坎为防守": "坎卦当令，防守稳固",
-    "离为核心": "离卦当令，核心发挥"
+GUA_XING_QING = {
+    "乾": "刚健主动，冠军气质，进攻为主",
+    "坤": "柔顺被动，防守反击，稳扎稳打",
+    "震": "活跃冲动，快速反击，冲击力强",
+    "巽": "灵活多变，边路渗透，定位球战术",
+    "坎": "沉稳防守，门将神勇，点球决胜",
+    "离": "华丽进攻，核心球员，进球大战",
+    "艮": "坚固防守，密集阵型，小胜格局",
+    "兑": "边路突破，点球机会，伤病隐患"
 }
+
+def get_gua_style(gua):
+    return GUA_XING_QING.get(gua, "常规打法")
+
+def get_gua_competition(gua):
+    info = GUA_LEI_XIANG.get(gua, {})
+    return info.get("比赛", "常规")
 
 # ============================================================
 # 3. 卦象数据结构
@@ -92,7 +91,7 @@ def auto_gua_by_teams(home, away):
     return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
 
 # ============================================================
-# 5. 五行生克与八卦性情（《春秋太卜》取象法）
+# 5. 五行生克与八卦性情
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
@@ -104,27 +103,79 @@ def wuxing_sheng_ke(wo, ta):
     elif ke[ta] == wo: return 2
     else: return 0
 
-# 八卦性情取象（用于比赛风格解读）
-GUA_XING_QING = {
-    "乾": "刚健主动，冠军气质，进攻为主",
-    "坤": "柔顺被动，防守反击，稳扎稳打",
-    "震": "活跃冲动，快速反击，冲击力强",
-    "巽": "灵活多变，边路渗透，定位球战术",
-    "坎": "沉稳防守，门将神勇，点球决胜",
-    "离": "华丽进攻，核心球员，进球大战",
-    "艮": "坚固防守，密集阵型，小胜格局",
-    "兑": "边路突破，点球机会，伤病隐患"
-}
-
-def get_gua_style(gua):
-    return GUA_XING_QING.get(gua, "常规打法")
-
-def get_gua_competition(gua):
-    info = GUA_LEI_XIANG.get(gua, {})
-    return info.get("比赛", "常规")
+# ============================================================
+# 6. 六爻逐爻详解函数
+# ============================================================
+def analyze_yaos(zhu_gua, bian_gua, dong_yao):
+    """
+    基于主卦、变卦和动爻位置，生成六个爻的详细解读。
+    返回一个列表，每个元素是包含爻位、阴阳、是否动爻、解读文本的字典。
+    """
+    # 获取主卦和变卦的上卦、下卦（仅用于参考）
+    shang_zhu, xia_zhu = GUA_STRUCT[zhu_gua]
+    shang_bian, xia_bian = GUA_STRUCT[bian_gua]
+    
+    # 爻位名称
+    yao_names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
+    # 爻位对应的“六子爻位”取象（来自《春秋太卜》）
+    yao_wei_xiang = {
+        "初爻": "震位，主足、根基、开端、民众、基层",
+        "二爻": "离位，主腹、内心、文书、家宅、中层",
+        "三爻": "艮位，主手、门户、兄弟、竞争、转折",
+        "四爻": "巽位，主股、妻财、市场、商旅、外联",
+        "五爻": "坎位，主耳、君王、道路、官非、中枢",
+        "上爻": "兑位，主口、外境、神佛、末路、结果"
+    }
+    
+    # 解析主卦的六个爻（阳爻或阴爻）—— 通过卦的结构反推
+    # 由于我们只有卦名，没有具体的爻象（阴阳排列），我们可以用卦的上下经卦组合，但不知道每个爻的阴阳。
+    # 实际上，六十四卦的每个卦的六爻阴阳是固定的，我们可以通过GUA_STRUCT得到上下经卦，但不知道爻的阴阳。
+    # 为了简化，我们在这里不具体列出每个爻的阴阳，而是基于动爻位置和卦象进行一般性解读。
+    # 更精确的做法是建立一个GUA_YAOS字典，但为了代码简洁，我们直接使用动爻位置和卦名进行解读。
+    
+    # 构建爻列表
+    yao_list = []
+    for i, yname in enumerate(yao_names):
+        # 判断是否为动爻
+        is_dong = (yname == dong_yao)
+        # 根据动爻位置，给出不同解读
+        if is_dong:
+            # 动爻详解
+            dong_detail = {
+                "初爻": "动于初爻（震位）：事件根基变动，主队开局或有变数，或从低位起步。",
+                "二爻": "动于二爻（离位）：内心或家宅之变，球队内部或有调整，中场控制关键。",
+                "三爻": "动于三爻（艮位）：竞争转折之变，兄弟之争，比赛走势可能在中段发生变化。",
+                "四爻": "动于四爻（巽位）：市场或外联变动，边路或替补可能成为奇兵。",
+                "五爻": "动于五爻（坎位）：中枢之动，领导或核心球员表现影响全局，或有关键判罚。",
+                "上爻": "动于上爻（兑位）：终局之变，比赛尾声或有绝杀/绝平，或场外因素干扰。"
+            }
+            desc = dong_detail.get(yname, "动爻位置需结合全卦分析。")
+        else:
+            # 静爻解读（基于爻位和卦象）
+            static_detail = {
+                "初爻": "静于初爻（震位）：基础稳定，主队开局稳健，按部就班。",
+                "二爻": "静于二爻（离位）：内部稳定，球队心态平和，执行力强。",
+                "三爻": "静于三爻（艮位）：竞争胶着，双方在中段僵持，难以打破平衡。",
+                "四爻": "静于四爻（巽位）：边路稳定，外援或替补未出奇招，按常规打法。",
+                "五爻": "静于五爻（坎位）：中枢稳固，核心球员正常发挥，比赛走势平稳。",
+                "上爻": "静于上爻（兑位）：结局平稳，比赛结果与预期一致，无意外。"
+            }
+            desc = static_detail.get(yname, "静爻，按常规解读。")
+        
+        # 补充爻位取象
+        wei_xiang = yao_wei_xiang.get(yname, "")
+        
+        yao_list.append({
+            "爻位": yname,
+            "是否动爻": is_dong,
+            "爻位取象": wei_xiang,
+            "解读": desc
+        })
+    
+    return yao_list
 
 # ============================================================
-# 6. 自动解卦函数（融合二十八法 + 春秋太卜取象）
+# 7. 自动解卦函数（融合二十八法 + 春秋太卜取象）
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     ping_ju = 0.0
@@ -199,9 +250,8 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
             detail.append("比和→平局")
             gua_analysis.append("体用比和：势均力敌")
 
-    # 动爻位置
+    # 动爻位置影响
     dong_effect = {"无动爻":1.0,"初爻":0.85,"二爻":0.9,"三爻":1.0,"四爻":1.05,"五爻":1.1,"上爻":1.15}
-    dong_factor = dong_effect.get(dong_yao, 1.0)
     if dong_yao in ["四爻","五爻","上爻"]:
         zhu_adv *= 1.05
         detail.append("动在上卦→进攻端活跃")
@@ -215,17 +265,20 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     zong_he = 1.0 + (zhu_adv-1.0) + (ke_adv-1.0) + (ping_ju*0.3) - (fen_sheng_fu*0.2)
     zong_he = max(0.5, min(1.5, zong_he))
 
-    # 比赛风格解读
+    # 比赛风格
     zhu_style = get_gua_style(zhu_gua)
     bian_style = get_gua_style(bian_gua)
     gua_analysis.append(f"主卦风格：{zhu_style}")
     gua_analysis.append(f"变卦风格：{bian_style}")
 
-    # 冠军/爆冷判断（《春秋太卜》乾为冠军）
+    # 特殊判断
     if zhu_gua == "乾" and dong_yao in ["五爻","上爻"]:
         gua_analysis.append("乾卦动于上位：冠军相显，主队强势")
     if zhu_gua in LIUCHONG_SET and dong_yao != "无动爻":
         gua_analysis.append("六冲有动：对抗激烈，无闷平")
+
+    # 逐爻详解
+    yao_details = analyze_yaos(zhu_gua, bian_gua, dong_yao)
 
     return {
         "ping_ju_tend": min(1.0, ping_ju),
@@ -236,11 +289,12 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
         "fen_sheng_fu": fen_sheng_fu,
         "zong_he": round(zong_he, 3),
         "detail": "；".join(detail) if detail else "常规",
-        "analysis": " | ".join(gua_analysis) if gua_analysis else "常规分析"
+        "analysis": " | ".join(gua_analysis) if gua_analysis else "常规分析",
+        "yao_details": yao_details   # 新增逐爻详解
     }
 
 # ============================================================
-# 7. 核心预测函数（Elo + 六爻修正）
+# 8. 核心预测函数（泊松分布 + Elo修正）
 # ============================================================
 def poisson_prob(lam, k):
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
@@ -298,7 +352,7 @@ def predict_wdl(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_small
     lam_h = max(0.3, lam_h)
     lam_a = max(0.3, lam_a)
 
-    # 胜平负概率（0~7球范围）
+    # 计算胜平负概率（0~7球）
     win_prob = 0.0
     draw_prob = 0.0
     lose_prob = 0.0
@@ -313,7 +367,7 @@ def predict_wdl(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_small
             else:
                 lose_prob += prob
 
-    # 卦象修正：平局倾向加强
+    # 平局修正
     if ping_ju > 0.5:
         draw_prob = draw_prob * (1 + ping_ju * 0.3)
         total = win_prob + draw_prob + lose_prob
@@ -325,33 +379,26 @@ def predict_wdl(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_small
     return win_prob * 100, draw_prob * 100, lose_prob * 100, lam_h, lam_a
 
 # ============================================================
-# 8. 生成报告函数（融入书籍取象解读）
+# 9. 生成报告函数（含卦象贡献、风格解读、置信度）
 # ============================================================
-def generate_report(home, away, league, elo_h, elo_a, bf_big, bf_small,
+def generate_report(home, away, league, match_time, elo_h, elo_a, bf_big, bf_small,
                     zhan_yi, liu_factors, win_p, draw_p, lose_p):
     probs = {"主胜": win_p, "平局": draw_p, "客胜": lose_p}
     sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
-    # 卦象解读
     if liu_factors['ping_ju_tend'] > 0.5:
         gua_summary = "卦象显示平局倾向明显"
-        direction_hint = "平局"
     elif liu_factors['zhu_advantage'] > liu_factors['ke_advantage']:
         gua_summary = "卦象显示主队略占优势"
-        direction_hint = "主队"
     else:
         gua_summary = "卦象显示客队略占优势"
-        direction_hint = "客队"
 
-    # 比赛风格解读
     style_info = liu_factors['analysis']
 
-    # 置信度
     max_p = max(win_p, draw_p, lose_p)
     confidence = 50 + min(40, (max_p - 30) * 0.8)
     confidence = min(90, confidence)
 
-    # 方向建议
     if win_p > draw_p and win_p > lose_p:
         direction = "主胜"
         advice = "主队实力占优或状态更好"
@@ -362,10 +409,13 @@ def generate_report(home, away, league, elo_h, elo_a, bf_big, bf_small,
         direction = "客胜"
         advice = "客队实力占优或战术克制"
 
+    time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
+
     report = f"""
 ┌─────────────────────────────────────────────────────────────┐
 │           📊 胜平负预测 —— {home} vs {away}                  │
 │                  （{league}）                               │
+│                  比赛时间：{time_str}                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  【1️⃣ 首推】{sorted_probs[0][0]}（{sorted_probs[0][1]:.1f}%）                          │
@@ -388,7 +438,7 @@ def generate_report(home, away, league, elo_h, elo_a, bf_big, bf_small,
 │    └─ 模型置信度：{confidence:.0f}%                          │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│  模型版本：V3.0 春秋太卜融合版                              │
+│  模型版本：V3.2 春秋太卜融合版（含逐爻详解）                  │
 │  关键信号：必发{bf_big}/{bf_small} + Elo差{elo_h - elo_a}         │
 │  提示：淘汰赛阶段平局概率通常上升                           │
 └─────────────────────────────────────────────────────────────┘
@@ -396,29 +446,8 @@ def generate_report(home, away, league, elo_h, elo_a, bf_big, bf_small,
     return report
 
 # ============================================================
-# 9. 知识库查询（书籍取象查询）
-# ============================================================
-def query_knowledge(keyword):
-    if keyword in GUA_LEI_XIANG:
-        info = GUA_LEI_XIANG[keyword]
-        return f"【{keyword}卦】\n五行：{info['五行']}\n人物：{info['人物']}\n场所：{info['场所']}\n方位：{info['方位']}\n数字：{info['数字']}\n动物：{info['动物']}\n人体：{info['人体']}\n比赛取象：{info['比赛']}\n风格：{GUA_XING_QING.get(keyword, '常规')}"
-    if keyword in ER_SHI_BA_FA:
-        return f"【{keyword}】\n{ER_SHI_BA_FA[keyword]}"
-    return "未找到，试试输入卦名（乾/坤）或断语（六合卦/体克用）"
-
-def knowledge_query_ui():
-    st.subheader("📚 卦象知识库")
-    keyword = st.text_input("输入关键词查询", placeholder="如：乾 或 六合卦 或 冠军")
-    if st.button("查询", use_container_width=True):
-        if keyword:
-            st.info(query_knowledge(keyword.strip()))
-        else:
-            st.warning("请输入关键词")
-
-# ============================================================
 # 10. 界面布局
 # ============================================================
-# 初始化session_state
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
 if 'bian_gua' not in st.session_state:
@@ -432,9 +461,10 @@ with st.expander("📌 比赛基本信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         home_team = st.text_input("请输入主队", value="利物浦")
-        league = st.selectbox("请选择赛程", list(LEAGUE_AVG_TOTAL.keys()))
+        league = st.selectbox("请选择赛事", list(LEAGUE_AVG_TOTAL.keys()))
     with col2:
         away_team = st.text_input("请输入客队", value="曼城")
+        match_time = st.datetime_input("比赛时间", value=datetime.now(), format="YYYY-MM-DD HH:mm")
 
 with st.expander("📊 核心数据", expanded=True):
     col1, col2 = st.columns(2)
@@ -457,13 +487,10 @@ with st.expander("🔮 六爻参数（自动起卦）", expanded=False):
     st.caption(f"详情: {liu['detail']}")
     st.caption(f"风格解读: {liu['analysis'][:80]}...")
 
-with st.expander("📚 卦象知识库", expanded=False):
-    knowledge_query_ui()
-
 # ============================================================
 # 11. 预测按钮
 # ============================================================
-if st.button("🚀 开始预测", type="primary", use_container_width=True):
+if st.button("🚀 自动预测胜平负", type="primary", use_container_width=True):
     # 自动起卦
     zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
     st.session_state.zhu_gua = zhu
@@ -479,7 +506,7 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
     )
 
     report = generate_report(
-        home_team, away_team, league,
+        home_team, away_team, league, match_time,
         elo_home, elo_away,
         bf_big, bf_small,
         zhan_yi, liu_factors,
@@ -488,7 +515,7 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
 
     st.code(report, language='text')
 
-    with st.expander("🔮 完整卦象解读"):
+    with st.expander("🔮 完整卦象解读（含逐爻详解）"):
         st.write(f"**主卦**: {zhu} | **变卦**: {bian} | **动爻**: {dong}")
         st.write(f"**平局倾向**: {liu_factors['ping_ju_tend']:.2f}")
         st.write(f"**主队优势系数**: {liu_factors['zhu_advantage']:.2f}")
@@ -496,5 +523,12 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
         st.write(f"**综合系数**: {liu_factors['zong_he']}")
         st.write(f"**卦象细节**: {liu_factors['detail']}")
         st.write(f"**风格解读**: {liu_factors['analysis']}")
+        st.write("---")
+        st.subheader("📜 六爻逐爻详解")
+        for yao in liu_factors['yao_details']:
+            dong_tag = "🔥 动爻" if yao['是否动爻'] else "静爻"
+            st.write(f"**{yao['爻位']}** ({dong_tag})")
+            st.write(f"  - 爻位取象：{yao['爻位取象']}")
+            st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 点击「开始预测」自动根据队名起卦并输出胜平负结果，融合春秋太卜取象法")
+st.caption("💡 点击「自动预测胜平负」根据队名自动起卦并输出结果，支持赛事与比赛时间记录 | 包含六爻逐爻详解")
