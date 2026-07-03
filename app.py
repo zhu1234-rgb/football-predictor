@@ -1,5 +1,6 @@
 import streamlit as st
 import math
+import hashlib
 
 # ============================================================
 # 1. 页面配置
@@ -9,7 +10,7 @@ st.title("⚽ 六爻 · 足球预测引擎")
 st.caption("输入Elo + 六爻参数，自动解卦融合二十八法")
 
 # ============================================================
-# 2. 知识库模块（卦象类象、六亲取象、二十八法断语）
+# 2. 知识库模块
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行":"金","人物":"领导、父亲","场所":"京都","方位":"西北","数字":"1,6","动物":"马","静物":"金玉","人体":"头","颜色":"白","五味":"辛"},
@@ -98,7 +99,23 @@ LIUCHONG_SET = {"乾","坎","兑","离","震","巽","艮","坤"}
 LEAGUE_AVG_TOTAL = {"英超":2.8,"西甲":2.6,"德甲":2.9,"意甲":2.5,"法甲":2.5,"日职":2.4,"K联赛":2.3,"世界杯":2.2}
 
 # ============================================================
-# 4. 五行生克函数
+# 4. 自动起卦函数（根据队名）
+# ============================================================
+def auto_gua_by_teams(home, away):
+    """根据主客队名生成主卦、变卦、动爻"""
+    combined = f"{home}_{away}"
+    hash_obj = hashlib.md5(combined.encode())
+    hex_digest = hash_obj.hexdigest()
+    seed = int(hex_digest[:8], 16)
+    zhu_index = seed % 64
+    bian_index = (seed // 64) % 64
+    dong_index = seed % 6  # 0~5 对应初爻~上爻，但我们映射到列表索引
+    dong_yao_list = ["初爻","二爻","三爻","四爻","五爻","上爻"]
+    dong_yao = dong_yao_list[dong_index]
+    return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
+
+# ============================================================
+# 5. 五行生克函数
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
@@ -111,7 +128,7 @@ def wuxing_sheng_ke(wo, ta):
     else: return 0
 
 # ============================================================
-# 5. 自动解卦函数（融合二十八法）
+# 6. 自动解卦函数（融合二十八法）
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     ping_ju = 0.0
@@ -175,7 +192,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
 
     # 动爻位置
     dong_effect = {"无动爻":1.0,"初爻":0.85,"二爻":0.9,"三爻":1.0,"四爻":1.05,"五爻":1.1,"上爻":1.15}
-    dong_factor = dong_effect[dong_yao]
+    dong_factor = dong_effect.get(dong_yao, 1.0)
     if dong_yao in ["四爻","五爻","上爻"]:
         zhu_adv *= 1.05
         detail.append("动在上卦→进攻端")
@@ -199,7 +216,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     }
 
 # ============================================================
-# 6. 核心预测函数（泊松分布 + 修正）
+# 7. 核心预测函数（泊松分布 + 修正）
 # ============================================================
 def poisson_prob(lam, k):
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
@@ -258,7 +275,7 @@ def predict_score(elo_h, elo_a, league_avg, zhan_yi, liu_factors, bf_big, bf_sma
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:5], lam_h, lam_a
 
 # ============================================================
-# 7. 知识库查询UI函数
+# 8. 知识库查询UI函数
 # ============================================================
 def knowledge_query_ui():
     st.subheader("📚 六爻知识库")
@@ -270,11 +287,17 @@ def knowledge_query_ui():
             st.warning("请输入关键词")
 
 # ============================================================
-# 8. 界面布局与主程序
+# 9. 界面布局与主程序
 # ============================================================
-# 初始化session_state
+# 初始化session_state（卦象选择值）
+if 'zhu_gua' not in st.session_state:
+    st.session_state.zhu_gua = "乾"
+if 'bian_gua' not in st.session_state:
+    st.session_state.bian_gua = "坤"
+if 'dong_yao' not in st.session_state:
+    st.session_state.dong_yao = "无动爻"
 if 'liu_result' not in st.session_state:
-    st.session_state.liu_result = auto_jie_gua("乾", "坤", "无动爻")
+    st.session_state.liu_result = auto_jie_gua(st.session_state.zhu_gua, st.session_state.bian_gua, st.session_state.dong_yao)
 
 with st.expander("📌 比赛基本信息", expanded=True):
     col1, col2 = st.columns(2)
@@ -294,18 +317,35 @@ with st.expander("📊 核心数据", expanded=True):
         elo_away = st.number_input("📊 客队Elo", 1000, 2500, 1850, 10)
 
 with st.expander("🔮 六爻参数", expanded=False):
+    # 自动起卦按钮
+    if st.button("🔄 根据队名自动起卦", use_container_width=True):
+        zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
+        st.session_state.zhu_gua = zhu
+        st.session_state.bian_gua = bian
+        st.session_state.dong_yao = dong
+        # 自动解卦
+        st.session_state.liu_result = auto_jie_gua(zhu, bian, dong)
+        st.success(f"起卦完成：主卦 {zhu}，变卦 {bian}，{dong}")
+
     col1, col2 = st.columns(2)
     with col1:
-        zhu_gua = st.selectbox("主卦", GUA_LIST, index=0)
-        dong_yao = st.selectbox("动爻位置", ["无动爻","初爻","二爻","三爻","四爻","五爻","上爻"], index=0)
+        zhu_gua = st.selectbox("主卦", GUA_LIST, index=GUA_LIST.index(st.session_state.zhu_gua), key="zhu_gua_select")
+        st.session_state.zhu_gua = zhu_gua
+        dong_yao = st.selectbox("动爻位置", ["无动爻","初爻","二爻","三爻","四爻","五爻","上爻"],
+                                index=["无动爻","初爻","二爻","三爻","四爻","五爻","上爻"].index(st.session_state.dong_yao),
+                                key="dong_yao_select")
+        st.session_state.dong_yao = dong_yao
     with col2:
-        bian_gua = st.selectbox("变卦", GUA_LIST, index=1)
+        bian_gua = st.selectbox("变卦", GUA_LIST, index=GUA_LIST.index(st.session_state.bian_gua), key="bian_gua_select")
+        st.session_state.bian_gua = bian_gua
         zhan_yi_opt = st.selectbox("战意系数", [("保级/争冠",1.4),("淘汰赛",1.2),("普通联赛",1.0),("无欲无求",0.85),("友谊赛",0.7)],
                                    format_func=lambda x: x[0])
         zhan_yi = zhan_yi_opt[1]
 
+    # 每次选择改变时自动重新解卦（但只有在点击"解卦"或"自动起卦"时才更新结果，这里我们保持手动触发）
+    # 所以增加一个"解卦"按钮
     if st.button("🔄 解卦", use_container_width=True):
-        st.session_state.liu_result = auto_jie_gua(zhu_gua, bian_gua, dong_yao)
+        st.session_state.liu_result = auto_jie_gua(st.session_state.zhu_gua, st.session_state.bian_gua, st.session_state.dong_yao)
         st.success("解卦完成")
 
     liu = st.session_state.liu_result
@@ -317,7 +357,7 @@ with st.expander("📚 知识库查询", expanded=False):
     knowledge_query_ui()
 
 # ============================================================
-# 9. 预测按钮
+# 10. 预测按钮
 # ============================================================
 if st.button("🚀 开始预测", type="primary", use_container_width=True):
     liu_factors = st.session_state.liu_result
@@ -361,4 +401,4 @@ if st.button("🚀 开始预测", type="primary", use_container_width=True):
         st.write(f"综合系数: {liu_factors['zong_he']}")
         st.caption(liu_factors['detail'])
 
-st.caption("💡 输入主卦、变卦、动爻后点击「解卦」，再点击「开始预测」")
+st.caption("💡 点击「根据队名自动起卦」可快速生成卦象，也可手动调整。")
