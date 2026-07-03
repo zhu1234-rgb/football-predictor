@@ -111,10 +111,6 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     基于主卦、变卦和动爻位置，生成六个爻的详细解读。
     返回一个列表，每个元素是包含爻位、阴阳、是否动爻、解读文本的字典。
     """
-    # 获取主卦和变卦的上卦、下卦（仅用于参考）
-    shang_zhu, xia_zhu = GUA_STRUCT[zhu_gua]
-    shang_bian, xia_bian = GUA_STRUCT[bian_gua]
-    
     # 爻位名称
     yao_names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
     # 爻位对应的“六子爻位”取象（来自《春秋太卜》）
@@ -127,20 +123,11 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
         "上爻": "兑位，主口、外境、神佛、末路、结果"
     }
     
-    # 解析主卦的六个爻（阳爻或阴爻）—— 通过卦的结构反推
-    # 由于我们只有卦名，没有具体的爻象（阴阳排列），我们可以用卦的上下经卦组合，但不知道每个爻的阴阳。
-    # 实际上，六十四卦的每个卦的六爻阴阳是固定的，我们可以通过GUA_STRUCT得到上下经卦，但不知道爻的阴阳。
-    # 为了简化，我们在这里不具体列出每个爻的阴阳，而是基于动爻位置和卦象进行一般性解读。
-    # 更精确的做法是建立一个GUA_YAOS字典，但为了代码简洁，我们直接使用动爻位置和卦名进行解读。
-    
     # 构建爻列表
     yao_list = []
     for i, yname in enumerate(yao_names):
-        # 判断是否为动爻
         is_dong = (yname == dong_yao)
-        # 根据动爻位置，给出不同解读
         if is_dong:
-            # 动爻详解
             dong_detail = {
                 "初爻": "动于初爻（震位）：事件根基变动，主队开局或有变数，或从低位起步。",
                 "二爻": "动于二爻（离位）：内心或家宅之变，球队内部或有调整，中场控制关键。",
@@ -151,7 +138,6 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
             }
             desc = dong_detail.get(yname, "动爻位置需结合全卦分析。")
         else:
-            # 静爻解读（基于爻位和卦象）
             static_detail = {
                 "初爻": "静于初爻（震位）：基础稳定，主队开局稳健，按部就班。",
                 "二爻": "静于二爻（离位）：内部稳定，球队心态平和，执行力强。",
@@ -162,9 +148,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
             }
             desc = static_detail.get(yname, "静爻，按常规解读。")
         
-        # 补充爻位取象
         wei_xiang = yao_wei_xiang.get(yname, "")
-        
         yao_list.append({
             "爻位": yname,
             "是否动爻": is_dong,
@@ -290,7 +274,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
         "zong_he": round(zong_he, 3),
         "detail": "；".join(detail) if detail else "常规",
         "analysis": " | ".join(gua_analysis) if gua_analysis else "常规分析",
-        "yao_details": yao_details   # 新增逐爻详解
+        "yao_details": yao_details
     }
 
 # ============================================================
@@ -464,7 +448,7 @@ with st.expander("📌 比赛基本信息", expanded=True):
         league = st.selectbox("请选择赛事", list(LEAGUE_AVG_TOTAL.keys()))
     with col2:
         away_team = st.text_input("请输入客队", value="曼城")
-        match_time = st.datetime_input("比赛时间", value=datetime.now(), format="YYYY-MM-DD HH:mm")
+        match_time = st.datetime_input("比赛时间", value=datetime.now())  # 移除format参数
 
 with st.expander("📊 核心数据", expanded=True):
     col1, col2 = st.columns(2)
@@ -531,4 +515,4 @@ if st.button("🚀 自动预测胜平负", type="primary", use_container_width=T
             st.write(f"  - 爻位取象：{yao['爻位取象']}")
             st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 点击「自动预测胜平负」根据队名自动起卦并输出结果，支持赛事与比赛时间记录 | 包含六爻逐爻详解")
+st.caption("💡 点击「自动预测胜平负」根据队名自动起卦并输出结果 | 包含六爻逐爻详解")
