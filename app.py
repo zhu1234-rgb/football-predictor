@@ -175,7 +175,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     return yao_list
 
 # ============================================================
-# 9. 自动解卦函数（平局倾向封顶0.75）
+# 9. 自动解卦函数
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     ping_ju = 0.0
@@ -270,7 +270,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     if zhu_gua in LIUCHONG_SET and dong_yao != "无动爻":
         gua_analysis.append("六冲有动：无闷平")
 
-    # ===== 优化：平局倾向封顶0.75 =====
+    # 平局倾向封顶0.75
     ping_ju = min(ping_ju, 0.75)
 
     yao_details = analyze_yaos(zhu_gua, bian_gua, dong_yao)
@@ -361,62 +361,64 @@ def predict_wdl_only(league_avg, zhan_yi, liu_factors):
     return win_prob, draw_prob, lose_prob, lam_h, lam_a
 
 # ============================================================
-# 11. 生成胜平负推荐（卦象优先 + 点球预警 + 晋级推荐）
+# 11. 生成推荐（首推、次推、晋级方向逻辑一致）
 # ============================================================
 def generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi, league, zhu_gua, bian_gua):
     probs = {"主胜": win_p, "平局": draw_p, "客胜": lose_p}
     sorted_by_prob = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
     ping_ju = liu_factors['ping_ju_tend']
-    
+    is_knockout = zhan_yi >= 1.2
+
+    # ----- 第一步：确定首推和次推 -----
     if ping_ju > 0.5:
+        # 首推平局，次推主胜/客胜中概率高的
         first = ("平局", draw_p)
         others = [("主胜", win_p), ("客胜", lose_p)]
         others_sorted = sorted(others, key=lambda x: x[1], reverse=True)
         second = others_sorted[0] if others_sorted[0][1] > 0 else ("-", 0)
         priority_reason = f"卦象平局倾向 {ping_ju:.2f}（>0.5），优先推荐平局"
     else:
+        # 按概率排序
         first = sorted_by_prob[0]
         second = sorted_by_prob[1] if len(sorted_by_prob) > 1 else ("-", 0)
         priority_reason = "按概率排序推荐"
 
-    # 点球预警
+    # ----- 第二步：晋级方向（与首推/次推逻辑一致）-----
+    # 如果首推是平局 → 晋级方向看次推
+    # 如果首推不是平局 → 晋级方向看首推
+    if first[0] == "平局":
+        if second[0] == "主胜":
+            advance = "主队（点球决胜）"
+            advance_reason = "常规时间平局，加时/点球更看好主队"
+        elif second[0] == "客胜":
+            advance = "客队（点球决胜）"
+            advance_reason = "常规时间平局，加时/点球更看好客队"
+        else:
+            advance = "不明确"
+            advance_reason = "主客概率接近，无法判断加时/点球方向"
+    else:
+        # 首推是主胜或客胜
+        advance = "主队（含加时/点球）" if first[0] == "主胜" else "客队（含加时/点球）"
+        advance_reason = f"常规时间首选{first[0]}，加时/点球延续此方向"
+
+    # ----- 第三步：点球预警 -----
     penalty_warning = ""
-    is_knockout = zhan_yi >= 1.2
     if ping_ju > 0.5 and is_knockout:
         penalty_warning = "⚠️ 本场为淘汰赛，平局概率较高，若常规时间战平将进入加时/点球决胜！"
 
-    # 晋级方向推荐
-    zhu_adv = liu_factors['zhu_advantage']
-    ke_adv = liu_factors['ke_advantage']
-    
-    if zhu_adv > ke_adv and win_p > lose_p:
-        advance = "主队（含加时/点球）"
-        advance_reason = "卦象主队占优 + 主胜概率更高"
-    elif ke_adv > zhu_adv and lose_p > win_p:
-        advance = "客队（含加时/点球）"
-        advance_reason = "卦象客队占优 + 客胜概率更高"
-    elif ping_ju > 0.5 and is_knockout:
-        if zhu_adv > ke_adv:
-            advance = "主队（点球决胜）"
-            advance_reason = "卦象主队略优，点球战更看好主队"
-        else:
-            advance = "客队（点球决胜）"
-            advance_reason = "卦象客队略优，点球战更看好客队"
-    else:
-        advance = "数据胶着，不明确"
-        advance_reason = "主客概率接近，卦象无明显指向"
-
+    # 战意提示
     zhan_yi_hint = ""
     if zhan_yi >= 1.2:
         zhan_yi_hint = "战意强烈，分胜负概率大"
     elif zhan_yi <= 0.85:
         zhan_yi_hint = "战意不足，需防平局"
 
+    # 卦象提示
     gua_hint = ""
     if ping_ju > 0.6:
         gua_hint = "卦象平局倾向强"
-    elif zhu_adv > ke_adv:
+    elif liu_factors['zhu_advantage'] > liu_factors['ke_advantage']:
         gua_hint = "卦象主队占优"
     else:
         gua_hint = "卦象客队占优"
@@ -441,7 +443,7 @@ def generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi, lea
     }
 
 # ============================================================
-# 12. 界面布局（修改输入框标签和占位符）
+# 12. 界面布局
 # ============================================================
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
@@ -455,11 +457,9 @@ if 'liu_result' not in st.session_state:
 with st.expander("📌 比赛基本信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
-        # 修改：标签改为"主队名"，去掉默认值，使用占位符
         home_team = st.text_input("主队名", placeholder="请输入主队名", value="")
         league = st.selectbox("请选择赛事", list(LEAGUE_AVG_TOTAL.keys()))
     with col2:
-        # 修改：标签改为"客队名"，去掉默认值，使用占位符
         away_team = st.text_input("客队名", placeholder="请输入客队名", value="")
         match_time = st.datetime_input("比赛时间", value=datetime.now())
 
@@ -470,11 +470,9 @@ zhan_yi = zhan_yi_opt[1]
 # 13. 预测按钮
 # ============================================================
 if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
-    # 检查是否为空
     if not home_team.strip() or not away_team.strip():
         st.warning("⚠️ 请输入主队名和客队名！")
     else:
-        # 自动起卦
         zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
         st.session_state.zhu_gua = zhu
         st.session_state.bian_gua = bian
@@ -490,7 +488,6 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
 
         result = generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi, league, zhu, bian)
 
-        # 显示结果
         st.markdown("---")
         st.markdown(f"### 📊 胜平负预测 —— {home_team} vs {away_team}")
         st.caption(f"赛事：{league} | 时间：{match_time.strftime('%Y-%m-%d %H:%M') if match_time else '未设置'} | {zhan_yi_opt[0]}")
@@ -542,4 +539,4 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
                 st.write(f"  - 爻位取象：{yao['爻位取象']}")
                 st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 点击「预测胜平负」自动起卦 | 平局倾向封顶0.75 | 淘汰赛自动触发点球预警")
+st.caption("💡 点击「预测胜平负」自动起卦 | 平局倾向封顶0.75 | 首推、次推、晋级方向逻辑一致")
