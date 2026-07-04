@@ -8,7 +8,7 @@ from datetime import datetime
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·胜平负预测", layout="centered", initial_sidebar_state="collapsed")
 st.title("⚽ 六爻 · 胜平负预测引擎")
-st.caption("融合《春秋太卜》《六爻心源》取象法 | 自动起卦 | 仅胜平负")
+st.caption("卦象优先 | 平局倾向 > 0.5 即首推平局 | 融合《春秋太卜》《六爻心源》")
 
 # ============================================================
 # 2. 赛事列表
@@ -147,12 +147,12 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
         is_dong = (yname == dong_yao)
         if is_dong:
             dong_detail = {
-                "初爻": "动于初爻（震位）：事件根基变动，开局或有变数。",
-                "二爻": "动于二爻（离位）：内部或家宅之变，球队内部或有调整。",
-                "三爻": "动于三爻（艮位）：竞争转折之变，走势在中段发生变化。",
-                "四爻": "动于四爻（巽位）：边路或替补可能成为奇兵。",
-                "五爻": "动于五爻（坎位）：核心球员表现影响全局，或有关键判罚。",
-                "上爻": "动于上爻（兑位）：终局之变，尾声或有绝杀/绝平。"
+                "初爻": "动于初爻：开局或有变数，从低位起步。",
+                "二爻": "动于二爻：球队内部或有调整，中场控制关键。",
+                "三爻": "动于三爻：走势在中段发生变化。",
+                "四爻": "动于四爻：边路或替补可能成为奇兵。",
+                "五爻": "动于五爻：核心球员表现影响全局，或有关键判罚。",
+                "上爻": "动于上爻：尾声或有绝杀/绝平。"
             }
             desc = dong_detail.get(yname, "动爻需结合全卦。")
         else:
@@ -160,7 +160,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
                 "初爻": "静于初爻：基础稳定，开局稳健。",
                 "二爻": "静于二爻：内部稳定，心态平和。",
                 "三爻": "静于三爻：竞争胶着，中段僵持。",
-                "四爻": "静于四爻：边路稳定，外援未出奇招。",
+                "四爻": "静于四爻：边路稳定，按常规打法。",
                 "五爻": "静于五爻：中枢稳固，核心正常发挥。",
                 "上爻": "静于上爻：结局平稳，结果与预期一致。"
             }
@@ -286,7 +286,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     }
 
 # ============================================================
-# 10. 核心预测函数（仅胜平负）
+# 10. 核心预测函数
 # ============================================================
 def poisson_prob(lam, k):
     return (math.exp(-lam) * (lam ** k)) / math.factorial(k)
@@ -358,22 +358,35 @@ def predict_wdl_only(league_avg, zhan_yi, liu_factors):
     return win_prob, draw_prob, lose_prob, lam_h, lam_a
 
 # ============================================================
-# 11. 生成胜平负推荐（三层推演风格）
+# 11. 生成胜平负推荐（卦象优先，平局倾向 >0.5 即首推平局）
 # ============================================================
 def generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi):
+    # 概率字典
     probs = {"主胜": win_p, "平局": draw_p, "客胜": lose_p}
-    sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
+    sorted_by_prob = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
-    # 首推、次推
-    first = sorted_probs[0]
-    second = sorted_probs[1] if len(sorted_probs) > 1 else ("-", 0)
+    # ===== 核心逻辑：卦象优先 =====
+    # 当卦象平局倾向 > 0.5 时，首推平局，次推概率最高的另一个
+    if liu_factors['ping_ju_tend'] > 0.5:
+        # 首推平局
+        first = ("平局", draw_p)
+        # 次推：从主胜/客胜中取概率高的
+        others = [("主胜", win_p), ("客胜", lose_p)]
+        others_sorted = sorted(others, key=lambda x: x[1], reverse=True)
+        second = others_sorted[0] if others_sorted[0][1] > 0 else ("-", 0)
+        priority_reason = "卦象平局倾向 > 0.5，优先推荐平局"
+    else:
+        # 否则按概率排序
+        first = sorted_by_prob[0]
+        second = sorted_by_prob[1] if len(sorted_by_prob) > 1 else ("-", 0)
+        priority_reason = "按概率排序推荐"
 
     # 战意提示
     zhan_yi_hint = ""
     if zhan_yi >= 1.2:
-        zhan_yi_hint = "（战意强烈，分胜负概率大）"
+        zhan_yi_hint = "战意强烈，分胜负概率大"
     elif zhan_yi <= 0.85:
-        zhan_yi_hint = "（战意不足，需防平局）"
+        zhan_yi_hint = "战意不足，需防平局"
 
     # 卦象修正提示
     gua_hint = ""
@@ -394,6 +407,7 @@ def generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi):
         "lose": lose_p,
         "zhan_yi_hint": zhan_yi_hint,
         "gua_hint": gua_hint,
+        "priority_reason": priority_reason,
         "zong_he": liu_factors['zong_he'],
         "ping_ju_tend": liu_factors['ping_ju_tend'],
         "analysis": liu_factors['analysis']
@@ -443,7 +457,7 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
 
     result = generate_wdl_recommendation(win_p, draw_p, lose_p, liu_factors, zhan_yi)
 
-    # -------- 显示结果（三层推演风格） --------
+    # -------- 显示结果（卦象优先） --------
     st.markdown("---")
     st.markdown(f"### 📊 胜平负预测 —— {home_team} vs {away_team}")
     st.caption(f"赛事：{league} | 时间：{match_time.strftime('%Y-%m-%d %H:%M') if match_time else '未设置'} | {zhan_yi_opt[0]}")
@@ -457,9 +471,12 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
     with col2:
         st.metric("🥈 次推", f"{result['second']}", f"{result['second_prob']:.1f}%")
 
+    # 显示卦象优先原因
+    st.caption(f"💡 推荐依据：{result['priority_reason']} | 平局倾向 {result['ping_ju_tend']:.2f}")
+
     st.markdown("---")
 
-    # 概率详情（进度条更直观）
+    # 概率详情
     st.write("**概率详情**")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -471,21 +488,11 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
 
     st.markdown("---")
 
-    # 融合推荐
-    if result['first'] == "主胜":
-        fusion_rec = f"首选主胜（{result['first_prob']:.1f}%）"
-    elif result['first'] == "平局":
-        fusion_rec = f"首选平局（{result['first_prob']:.1f}%）"
-    else:
-        fusion_rec = f"首选客胜（{result['first_prob']:.1f}%）"
-
-    st.info(f"💡 **融合推荐**：{fusion_rec}　|　{result['gua_hint']}　|　综合系数 {result['zong_he']:.2f}")
-
-    st.markdown("---")
-    st.caption(f"模型版本：V4.0 胜平负专精版 | 平局倾向 {result['ping_ju_tend']:.2f} | {result['zhan_yi_hint']}")
+    # 融合信息
+    st.info(f"🧩 **卦象**：{result['gua_hint']}　|　**综合系数**：{result['zong_he']:.2f}　|　{result['zhan_yi_hint']}")
 
     # 展开详细卦象
-    with st.expander("🔮 卦象解读（含逐爻详解）"):
+    with st.expander("🔮 详细卦象解读（含逐爻详解）"):
         st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
         st.write(f"**平局倾向**：{liu_factors['ping_ju_tend']:.2f}")
         st.write(f"**主队优势系数**：{liu_factors['zhu_advantage']:.2f}")
@@ -501,4 +508,4 @@ if st.button("🚀 预测胜平负", type="primary", use_container_width=True):
             st.write(f"  - 爻位取象：{yao['爻位取象']}")
             st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 点击「预测胜平负」自动起卦并输出 | 基于泊松分布+六爻修正")
+st.caption("💡 点击「预测胜平负」自动起卦 | 卦象平局倾向 > 0.5 时首推平局")
