@@ -167,7 +167,6 @@ def get_gua_ji_xiong(gua):
 # 7. 自动起卦函数（队名起卦）
 # ============================================================
 def auto_gua_by_teams(home, away):
-    """用主队名和客队名拼接后MD5哈希起卦"""
     combined = f"{home}_{away}"
     hash_obj = hashlib.md5(combined.encode())
     hex_digest = hash_obj.hexdigest()
@@ -210,22 +209,22 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
         is_dong = (yname == dong_yao)
         if is_dong:
             dong_detail = {
-                "初爻": "动于初爻（震位）：事件根基变动，开局或有变数，从低位起步。",
-                "二爻": "动于二爻（离位）：内心或家宅之变，球队内部或有调整，中场控制关键。",
-                "三爻": "动于三爻（艮位）：竞争转折之变，走势在中段发生变化。",
-                "四爻": "动于四爻（巽位）：市场或外联变动，边路或替补可能成为奇兵。",
-                "五爻": "动于五爻（坎位）：中枢之动，核心球员表现影响全局，或有关键判罚。",
-                "上爻": "动于上爻（兑位）：终局之变，尾声或有绝杀/绝平，或场外因素干扰。"
+                "初爻": "动于初爻（震位）：事件根基变动，开局或有变数。",
+                "二爻": "动于二爻（离位）：内部或有调整，中场控制关键。",
+                "三爻": "动于三爻（艮位）：走势在中段发生变化。",
+                "四爻": "动于四爻（巽位）：边路或替补可能成为奇兵。",
+                "五爻": "动于五爻（坎位）：核心球员或关键判罚影响全局。",
+                "上爻": "动于上爻（兑位）：尾声或有绝杀/绝平。"
             }
             desc = dong_detail.get(yname, "动爻需结合全卦。")
         else:
             static_detail = {
-                "初爻": "静于初爻：基础稳定，开局稳健，按部就班。",
-                "二爻": "静于二爻：内部稳定，心态平和，执行力强。",
-                "三爻": "静于三爻：竞争胶着，中段僵持，难以打破平衡。",
-                "四爻": "静于四爻：边路稳定，外援或替补未出奇招。",
-                "五爻": "静于五爻：中枢稳固，核心正常发挥，走势平稳。",
-                "上爻": "静于上爻：结局平稳，结果与预期一致。"
+                "初爻": "静于初爻：基础稳定，开局稳健。",
+                "二爻": "静于二爻：内部稳定，心态平和。",
+                "三爻": "静于三爻：中段僵持。",
+                "四爻": "静于四爻：边路稳定。",
+                "五爻": "静于五爻：中枢稳固，核心正常发挥。",
+                "上爻": "静于上爻：结局平稳。"
             }
             desc = static_detail.get(yname, "静爻常规解读。")
         wei_xiang = yao_wei_xiang.get(yname, "")
@@ -241,17 +240,12 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
 # 10. 五维推演核心函数
 # ============================================================
 def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
-    """
-    五维推演：体用生克、卦象属性、动爻位置、卦气旺衰、卦名吉凶
-    """
     score = 0.0
     details = []
     scores_detail = {}
 
-    # ----- 维度1：体用生克（权重30%）-----
+    # 维度1：体用生克（权重30%）
     if dong_yao == "无动爻":
-        rel = 0
-        score += 0
         details.append("体用生克：无动爻，体用比和，主客均衡")
         scores_detail["体用生克"] = 0
     else:
@@ -261,10 +255,10 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         xia_wu = GUA_WUXING_MAP[xia]
         if dong_idx < 3:
             ti_wu, yong_wu = shang_wu, xia_wu
-            detail_add = "（下卦动，下卦为用，上卦为体）"
+            detail_add = "（下卦为用，上卦为体）"
         else:
             ti_wu, yong_wu = xia_wu, shang_wu
-            detail_add = "（上卦动，上卦为用，下卦为体）"
+            detail_add = "（上卦为用，下卦为体）"
         rel = wuxing_sheng_ke(ti_wu, yong_wu)
         if rel == -2:
             score += 0.30
@@ -283,77 +277,63 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
             details.append(f"体用生克：体克用，主克客，主队胜机更大 {detail_add}")
             scores_detail["体用生克"] = 0.20
         else:
-            score += 0
             details.append(f"体用生克：比和，主客均衡 {detail_add}")
             scores_detail["体用生克"] = 0
 
-    # ----- 维度2：卦象属性（权重25%）-----
+    # 维度2：卦象属性（权重25%）
     attr_score = 0
     attr_detail = []
     if zhu_gua in LIUHE_SET:
         attr_score += 0.15
-        attr_detail.append("六合卦：平局倾向高")
+        attr_detail.append("六合卦→平局倾向高")
     if bian_gua in LIUHE_SET:
         attr_score += 0.10
-        attr_detail.append("变卦六合：趋向平局")
+        attr_detail.append("变卦六合→趋平")
     if zhu_gua in LIUCHONG_SET:
         attr_score -= 0.20
-        attr_detail.append("六冲卦：分胜负倾向强")
+        attr_detail.append("六冲卦→分胜负")
     if zhu_gua in GUIHUN_SET:
         attr_score += 0.10
-        attr_detail.append("归魂卦：胶着反复，平局倾向")
+        attr_detail.append("归魂卦→胶着反复")
     if zhu_gua in YOUHUN_SET:
         attr_score -= 0.15
-        attr_detail.append("游魂卦：客队不败倾向")
+        attr_detail.append("游魂卦→客不败")
     if zhu_gua == "明夷" or bian_gua == "明夷":
         attr_score -= 0.10
-        attr_detail.append("明夷卦：光明受伤，客队有利")
+        attr_detail.append("明夷卦→客队有利")
     score += attr_score * 0.8
     details.append(f"卦象属性：{attr_detail[0] if attr_detail else '常规卦象'}")
     scores_detail["卦象属性"] = attr_score
 
-    # ----- 维度3：动爻位置（权重20%）-----
+    # 维度3：动爻位置（权重20%）
     dong_score = 0
     if dong_yao == "无动爻":
-        dong_score = 0
         details.append("动爻位置：无动爻，局势稳定")
     else:
-        yao_effect = {
-            "初爻": 0.1,
-            "二爻": 0.05,
-            "三爻": 0,
-            "四爻": -0.05,
-            "五爻": -0.1,
-            "上爻": -0.15
-        }
+        yao_effect = {"初爻":0.1,"二爻":0.05,"三爻":0,"四爻":-0.05,"五爻":-0.1,"上爻":-0.15}
         dong_score = yao_effect.get(dong_yao, 0)
         yao_desc = {
-            "初爻": "动于初爻：开局定势，客队可能先发制人",
-            "二爻": "动于二爻：球队内部调整",
-            "三爻": "动于三爻：中段转折，比赛走势变化",
-            "四爻": "动于四爻：替补或边路成为变量",
-            "五爻": "动于五爻：核心球员或关键判罚影响全局",
-            "上爻": "动于上爻：终局之变，客队后程发力"
+            "初爻": "动于初爻：开局定势",
+            "二爻": "动于二爻：内部调整",
+            "三爻": "动于三爻：中段转折",
+            "四爻": "动于四爻：替补变量",
+            "五爻": "动于五爻：核心关键",
+            "上爻": "动于上爻：终局之变"
         }
-        details.append(f"动爻位置：{yao_desc.get(dong_yao, '动爻需结合全卦')}")
+        details.append(f"动爻位置：{yao_desc.get(dong_yao, '')}")
     score += dong_score * 0.4
     scores_detail["动爻位置"] = dong_score
 
-    # ----- 维度4：卦气旺衰（权重15%）-----
+    # 维度4：卦气旺衰（权重15%）
     if match_time:
         month = match_time.month
     else:
         month = datetime.now().month
-    if month in [1, 2]:
-        month_wuxing = "木"
-    elif month in [4, 5]:
-        month_wuxing = "火"
-    elif month in [7, 8]:
-        month_wuxing = "金"
-    elif month in [10, 11]:
-        month_wuxing = "水"
-    else:
-        month_wuxing = "土"
+    if month in [1,2]: month_wuxing = "木"
+    elif month in [4,5]: month_wuxing = "火"
+    elif month in [7,8]: month_wuxing = "金"
+    elif month in [10,11]: month_wuxing = "水"
+    else: month_wuxing = "土"
     
     shang, xia = GUA_STRUCT[zhu_gua]
     gua_wuxing = GUA_WUXING_MAP[shang]
@@ -362,20 +342,19 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     qi_score = 0
     if month_wuxing == gua_wuxing:
         qi_score = 0.05
-        details.append(f"卦气旺衰：卦气与月建同五行({month_wuxing})，得时令")
+        details.append(f"卦气旺衰：卦气与月建同五行")
     elif sheng.get(month_wuxing) == gua_wuxing:
         qi_score = 0.10
-        details.append(f"卦气旺衰：月建({month_wuxing})生卦气({gua_wuxing})，主队得势")
+        details.append(f"卦气旺衰：月建生卦气，主队得势")
     elif ke.get(month_wuxing) == gua_wuxing:
         qi_score = -0.10
-        details.append(f"卦气旺衰：月建({month_wuxing})克卦气({gua_wuxing})，主队受压")
+        details.append(f"卦气旺衰：月建克卦气，主队受压")
     else:
-        qi_score = 0
-        details.append(f"卦气旺衰：月建({month_wuxing})与卦气({gua_wuxing})无生克")
+        details.append(f"卦气旺衰：月建与卦气无生克")
     score += qi_score * 0.5
     scores_detail["卦气旺衰"] = qi_score
 
-    # ----- 维度5：卦名吉凶（权重10%）-----
+    # 维度5：卦名吉凶（权重10%）
     ji_xiong = get_gua_ji_xiong(zhu_gua)
     jx_score = 0
     if "大吉" in ji_xiong or "吉" in ji_xiong:
@@ -388,10 +367,8 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     details.append(f"卦名吉凶：{ji_xiong}")
     scores_detail["卦名吉凶"] = jx_score
 
-    # ----- 综合判断 -----
-    # 平局倾向计算（六合卦显著提升平局概率）
+    # 综合判断
     ping_ju_base = 1 - min(abs(score) * 0.8, 0.7)
-    # 六合卦额外提升平局倾向
     if zhu_gua in LIUHE_SET:
         ping_ju_tend = min(ping_ju_base + 0.25, 0.95)
     elif bian_gua in LIUHE_SET:
@@ -400,7 +377,6 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         ping_ju_tend = ping_ju_base
     ping_ju_tend = max(0.1, min(0.95, ping_ju_tend))
     
-    # 首推判断
     if ping_ju_tend > 0.55:
         first = "平局"
         second = "客胜" if score < 0 else "主胜"
@@ -442,7 +418,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     if bian_gua in LIUHE_SET:
         gua_analysis.append("变卦六合：趋平")
     if bian_gua == "明夷" or zhu_gua == "明夷":
-        gua_analysis.append("明夷卦：光明受伤，客队有利")
+        gua_analysis.append("明夷卦：客队有利")
     zhu_style = get_gua_style(zhu_gua)
     bian_style = get_gua_style(bian_gua)
     gua_analysis.append(f"主卦风格：{zhu_style}")
@@ -454,79 +430,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     }
 
 # ============================================================
-# 12. 生成报告
-# ============================================================
-def generate_report(home, away, league, match_time, zhan_yi, zhu_gua, bian_gua, dong_yao, five_dim):
-    time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
-    first = five_dim["first"]
-    second = five_dim["second"]
-    score = five_dim["score"]
-    ping_ju = five_dim["ping_ju_tend"]
-
-    if first == "平局":
-        score_hint = "1-1 / 0-0"
-    elif first == "主胜":
-        score_hint = "2-1 / 1-0"
-    else:
-        score_hint = "0-1 / 1-2"
-
-    s = five_dim["scores_detail"]
-    score_lines = [
-        f"  体用生克：{s.get('体用生克', 0):+.2f}",
-        f"  卦象属性：{s.get('卦象属性', 0):+.2f}",
-        f"  动爻位置：{s.get('动爻位置', 0):+.2f}",
-        f"  卦气旺衰：{s.get('卦气旺衰', 0):+.2f}",
-        f"  卦名吉凶：{s.get('卦名吉凶', 0):+.2f}"
-    ]
-
-    report = f"""
-┌─────────────────────────────────────────────────────────────┐
-│           📊 纯卦象预测 —— {home} vs {away}                  │
-│                  （{league}）                               │
-│                  比赛时间：{time_str}                        │
-│                  战意：{zhan_yi}                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  【1️⃣ 首推】{first}                                          │
-│                                                             │
-│  【2️⃣ 次推】{second}                                        │
-│                                                             │
-│  【3️⃣ 五维推演】                                            │
-│    综合倾向分：{score:+.2f}（正=主胜，负=客胜，0=平局）     │
-│    平局倾向：{ping_ju:.2f}                                  │
-│                                                             │
-│    ┌──────────────────────────────────────────────────────┐ │
-│    │ {score_lines[0]}                                    │ │
-│    │ {score_lines[1]}                                    │ │
-│    │ {score_lines[2]}                                    │ │
-│    │ {score_lines[3]}                                    │ │
-│    │ {score_lines[4]}                                    │ │
-│    └──────────────────────────────────────────────────────┘ │
-│                                                             │
-│  【4️⃣ 推演详情】                                            │
-│    {five_dim['details'][0] if len(five_dim['details'])>0 else '无'}          │
-│    {five_dim['details'][1] if len(five_dim['details'])>1 else ''}          │
-│    {five_dim['details'][2] if len(five_dim['details'])>2 else ''}          │
-│    {five_dim['details'][3] if len(five_dim['details'])>3 else ''}          │
-│    {five_dim['details'][4] if len(five_dim['details'])>4 else ''}          │
-│                                                             │
-│  【5️⃣ 比分参考】{score_hint}                                 │
-│                                                             │
-│  【6️⃣ 卦象信息】                                             │
-│    主卦：{zhu_gua} | 变卦：{bian_gua} | 动爻：{dong_yao}      │
-│    卦气：{five_dim['gua_wuxing']}（月建{five_dim['month_wuxing']}）        │
-│    卦名吉凶：{five_dim['ji_xiong']}                         │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  起卦方式：主队名_客队名 → MD5哈希                         │
-│  模型版本：V5.0 纯卦象·五维推演版                          │
-│  核心：体用生克 | 卦象属性 | 动爻位置 | 卦气旺衰 | 卦名吉凶│
-└─────────────────────────────────────────────────────────────┘
-"""
-    return report
-
-# ============================================================
-# 13. 界面布局
+# 12. 界面布局
 # ============================================================
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
@@ -550,7 +454,7 @@ zhan_yi_opt = st.selectbox("⚔️ 战意系数", ZHAN_YI_LIST, format_func=lamb
 zhan_yi = zhan_yi_opt[1]
 
 # ============================================================
-# 14. 预测按钮
+# 13. 预测按钮 + 手机友好输出
 # ============================================================
 if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
     if not home_team.strip() or not away_team.strip():
@@ -570,15 +474,64 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         st.session_state.liu_result = liu_factors
 
         zhan_yi_name = zhan_yi_opt[0]
-        report = generate_report(home_team, away_team, league, match_time, zhan_yi_name, zhu, bian, dong, five_dim)
-        st.code(report, language='text')
-
+        s = five_dim['scores_detail']
+        time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
+        
+        # ----- 手机友好分段显示 -----
+        st.markdown("---")
+        
+        # 标题
+        st.markdown(f"### 📊 {home_team} vs {away_team}")
+        st.caption(f"{league} | {time_str} | {zhan_yi_name}")
+        
+        # 首推/次推（大号突出）
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**🏆 首推**")
+            st.markdown(f"### {five_dim['first']}")
+        with col2:
+            st.markdown(f"**🥈 次推**")
+            st.markdown(f"### {five_dim['second']}")
+        
+        st.markdown("---")
+        
+        # 五维得分（紧凑）
+        st.markdown("**五维推演**")
+        st.caption(f"综合倾向：{five_dim['score']:+.2f}（正=主胜） | 平局倾向：{five_dim['ping_ju_tend']:.2f}")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.metric("体用", f"{s.get('体用生克', 0):+.2f}")
+        with col2:
+            st.metric("卦象", f"{s.get('卦象属性', 0):+.2f}")
+        with col3:
+            st.metric("动爻", f"{s.get('动爻位置', 0):+.2f}")
+        with col4:
+            st.metric("卦气", f"{s.get('卦气旺衰', 0):+.2f}")
+        with col5:
+            st.metric("卦名", f"{s.get('卦名吉凶', 0):+.2f}")
+        
+        st.markdown("---")
+        
+        # 推演详情
+        st.markdown("**推演详情**")
+        for d in five_dim['details']:
+            st.caption(f"• {d}")
+        
+        st.markdown("---")
+        
+        # 卦象信息
+        st.markdown(f"**卦象**：{zhu} → {bian}　|　**动爻**：{dong}")
+        st.caption(f"卦气：{five_dim['gua_wuxing']}（月建{five_dim['month_wuxing']}）")
+        st.caption(f"卦名吉凶：{five_dim['ji_xiong']}")
+        
+        # 详细解读（折叠）
         with st.expander("🔮 详细卦象解读（含逐爻详解）"):
             st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
-            st.write(f"**综合倾向分**：{five_dim['score']:+.2f}（正=主胜，负=客胜）")
+            st.write(f"**综合倾向分**：{five_dim['score']:+.2f}")
             st.write(f"**平局倾向**：{five_dim['ping_ju_tend']:.2f}")
-            st.write("**五维得分详情**：")
-            for k, v in five_dim['scores_detail'].items():
+            st.write("**五维得分**：")
+            for k, v in s.items():
                 st.write(f"  - {k}：{v:+.2f}")
             st.write("**推演详情**：")
             for d in five_dim['details']:
@@ -591,4 +544,4 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
                 st.write(f"  - 爻位取象：{yao['爻位取象']}")
                 st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 起卦方式：主队名_客队名 → MD5哈希 → 定卦象 | 纯卦象预测，无需赔率、ELO等外部数据")
+st.caption("💡 起卦方式：主队名_客队名 → MD5哈希 → 定卦象")
