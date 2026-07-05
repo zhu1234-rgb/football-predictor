@@ -46,7 +46,7 @@ ZHAN_YI_LIST = [
 ]
 
 # ============================================================
-# 4. 卦象数据（精简）
+# 4. 卦象数据
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行":"金","比赛":"冠军、强势方、大胜"},
@@ -208,9 +208,9 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     details = []
     scores_detail = {}
     
-    # 存储体用生克结果，用于后续调整
     ti_ke_result = None
     rel_type = None
+    is_liuhe = False
 
     # 维度1：体用生克（权重30%）
     if dong_yao == "无动爻":
@@ -259,10 +259,8 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     # 维度2：卦象属性（权重25%）
     attr_score = 0
     attr_detail = []
-    is_liuhe = False
     if zhu_gua in LIUHE_SET:
         is_liuhe = True
-        # 优化：当体生用或用克体时，六合卦平局加成减半
         if ti_ke_result in ["体生用", "用克体"]:
             attr_score += 0.08
             attr_detail.append("六合卦（体生用/用克体→加成减半）")
@@ -344,10 +342,8 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     scores_detail["卦名吉凶"] = jx_score
 
     # 综合判断（优化版）
-    # 平局倾向：基础值 + 六合卦加成（已减半）
     ping_ju_base = 1 - min(abs(score) * 0.8, 0.7)
     
-    # 检查是否为六合卦且体生用/用克体（已减半处理）
     if is_liuhe and ti_ke_result in ["体生用", "用克体"]:
         ping_ju_tend = min(ping_ju_base + 0.12, 0.85)
     elif is_liuhe:
@@ -358,7 +354,7 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         ping_ju_tend = ping_ju_base
     ping_ju_tend = max(0.1, min(0.95, ping_ju_tend))
     
-    # 首推判断（优化：体生用+六合卦不再强制平局）
+    # 首推判断
     if ping_ju_tend > 0.60:
         first = "平局"
         second = "客胜" if score < 0 else "主胜"
@@ -369,7 +365,6 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         first = "客胜"
         second = "平局" if ping_ju_tend > 0.4 else "主胜"
     else:
-        # 当score在-0.15到0.15之间，优先判断体用生克
         if ti_ke_result == "用克体":
             first = "客胜"
             second = "平局"
@@ -458,16 +453,13 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
     if not home_team.strip() or not away_team.strip():
         st.warning("⚠️ 请输入主队名和客队名！")
     else:
-        # 起卦
         zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
         st.session_state.zhu_gua = zhu
         st.session_state.bian_gua = bian
         st.session_state.dong_yao = dong
 
-        # 五维推演
         five_dim = five_dimension_analysis(zhu, bian, dong, match_time)
         
-        # 解卦
         liu_factors = auto_jie_gua(zhu, bian, dong)
         st.session_state.liu_result = liu_factors
 
@@ -475,13 +467,11 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         s = five_dim['scores_detail']
         time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
         
-        # ----- 手机友好分段显示 -----
         st.markdown("---")
         
         st.markdown(f"### 📊 {home_team} vs {away_team}")
         st.caption(f"{league} | {time_str} | {zhan_yi_name}")
         
-        # 首推/次推
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**🏆 首推**")
@@ -492,7 +482,6 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("---")
         
-        # 五维得分
         st.markdown("**五维推演**")
         st.caption(f"综合倾向：{five_dim['score']:+.2f}（正=主胜） | 平局倾向：{five_dim['ping_ju_tend']:.2f}")
         
@@ -510,7 +499,6 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("---")
         
-        # 推演详情
         st.markdown("**推演详情**")
         for d in five_dim['details']:
             st.caption(f"• {d}")
@@ -529,14 +517,12 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("---")
         
-        # 卦象信息
         st.markdown(f"**卦象**：{zhu} → {bian}　|　**动爻**：{dong}")
         st.caption(f"卦气：{five_dim['gua_wuxing']}（月建{five_dim['month_wuxing']}）")
         st.caption(f"卦名吉凶：{five_dim['ji_xiong']}")
         if five_dim['is_liuhe']:
             st.caption(f"六合卦加成：{'已减半（体生用/用克体）' if five_dim['ti_ke_result'] in ['体生用','用克体'] else '正常'}")
         
-        # 详细解读（折叠）
         with st.expander("🔮 详细卦象解读（含逐爻详解）"):
             st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
             st.write(f"**体用生克关系**：{five_dim['ti_ke_result']}")
