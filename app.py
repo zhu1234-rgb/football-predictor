@@ -8,7 +8,7 @@ from datetime import datetime
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·纯卦象预测", layout="centered", initial_sidebar_state="collapsed")
 st.title("⚽ 六爻 · 纯卦象预测引擎")
-st.caption("优化版 | 六合卦平局加成减半 | 体生用不再强制平局 | 比分双方向输出")
+st.caption("优化版 V6 | 六合卦平局加成减半 | 体生用/用克体客队优先")
 
 # ============================================================
 # 2. 赛事列表
@@ -201,7 +201,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     return yao_list
 
 # ============================================================
-# 10. 五维推演核心函数（优化版）
+# 10. 五维推演核心函数（V6最终优化版）
 # ============================================================
 def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     score = 0.0
@@ -209,15 +209,13 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     scores_detail = {}
     
     ti_ke_result = None
-    rel_type = None
     is_liuhe = False
 
-    # 维度1：体用生克（权重30%）
+    # ----- 维度1：体用生克（权重30%）-----
     if dong_yao == "无动爻":
         details.append("体用生克：无动爻，体用比和，主客均衡")
         scores_detail["体用生克"] = 0
         ti_ke_result = "比和"
-        rel_type = 0
     else:
         dong_idx = {"初爻":0,"二爻":1,"三爻":2,"四爻":3,"五爻":4,"上爻":5}[dong_yao]
         shang, xia = GUA_STRUCT[zhu_gua]
@@ -230,7 +228,6 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
             ti_wu, yong_wu = xia_wu, shang_wu
             detail_add = "（上卦为用，下卦为体）"
         rel = wuxing_sheng_ke(ti_wu, yong_wu)
-        rel_type = rel
         if rel == -2:
             score += 0.30
             details.append(f"体用生克：用生体，客生主，主队得利 {detail_add}")
@@ -256,17 +253,21 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
             scores_detail["体用生克"] = 0
             ti_ke_result = "比和"
 
-    # 维度2：卦象属性（权重25%）
+    # ----- 维度2：卦象属性（权重25%）-----
     attr_score = 0
     attr_detail = []
+    
+    # 检测六合卦
     if zhu_gua in LIUHE_SET:
         is_liuhe = True
+        # ★★★ 核心优化：体生用/用克体时，六合卦平局加成减半 ★★★
         if ti_ke_result in ["体生用", "用克体"]:
             attr_score += 0.08
             attr_detail.append("六合卦（体生用/用克体→加成减半）")
         else:
             attr_score += 0.15
             attr_detail.append("六合卦→平局倾向高")
+    
     if bian_gua in LIUHE_SET:
         attr_score += 0.08
         attr_detail.append("变卦六合→趋平")
@@ -282,11 +283,12 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     if zhu_gua == "明夷" or bian_gua == "明夷":
         attr_score -= 0.10
         attr_detail.append("明夷卦→客队有利")
+    
     score += attr_score * 0.8
     details.append(f"卦象属性：{attr_detail[0] if attr_detail else '常规卦象'}")
     scores_detail["卦象属性"] = attr_score
 
-    # 维度3：动爻位置（权重20%）
+    # ----- 维度3：动爻位置（权重20%）-----
     dong_score = 0
     if dong_yao == "无动爻":
         details.append("动爻位置：无动爻，局势稳定")
@@ -298,7 +300,7 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     score += dong_score * 0.4
     scores_detail["动爻位置"] = dong_score
 
-    # 维度4：卦气旺衰（权重15%）
+    # ----- 维度4：卦气旺衰（权重15%）-----
     if match_time:
         month = match_time.month
     else:
@@ -328,7 +330,7 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     score += qi_score * 0.5
     scores_detail["卦气旺衰"] = qi_score
 
-    # 维度5：卦名吉凶（权重10%）
+    # ----- 维度5：卦名吉凶（权重10%）-----
     ji_xiong = get_gua_ji_xiong(zhu_gua)
     jx_score = 0
     if "大吉" in ji_xiong or "吉" in ji_xiong:
@@ -341,45 +343,64 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     details.append(f"卦名吉凶：{ji_xiong}")
     scores_detail["卦名吉凶"] = jx_score
 
-    # 综合判断（优化版）
-    ping_ju_base = 1 - min(abs(score) * 0.8, 0.7)
+    # ============================================================
+    # ★★★ 综合判断（V6最终优化）★★★
+    # ============================================================
     
-    if is_liuhe and ti_ke_result in ["体生用", "用克体"]:
-        ping_ju_tend = min(ping_ju_base + 0.12, 0.85)
-    elif is_liuhe:
-        ping_ju_tend = min(ping_ju_base + 0.25, 0.95)
-    elif bian_gua in LIUHE_SET:
-        ping_ju_tend = min(ping_ju_base + 0.12, 0.80)
+    # 1. 计算平局倾向基础值
+    # 当score偏向客队时，平局倾向应降低，而不是升高
+    abs_score = abs(score)
+    if abs_score > 0.3:
+        ping_ju_base = 0.25
+    elif abs_score > 0.15:
+        ping_ju_base = 0.35
+    elif abs_score > 0.05:
+        ping_ju_base = 0.45
     else:
-        ping_ju_tend = ping_ju_base
-    ping_ju_tend = max(0.1, min(0.95, ping_ju_tend))
+        ping_ju_base = 0.55
     
-    # 首推判断
-    if ping_ju_tend > 0.60:
-        first = "平局"
-        second = "客胜" if score < 0 else "主胜"
-    elif score > 0.15:
-        first = "主胜"
-        second = "平局" if ping_ju_tend > 0.4 else "客胜"
-    elif score < -0.15:
-        first = "客胜"
-        second = "平局" if ping_ju_tend > 0.4 else "主胜"
-    else:
-        if ti_ke_result == "用克体":
-            first = "客胜"
-            second = "平局"
-        elif ti_ke_result == "体克用":
-            first = "主胜"
-            second = "平局"
-        elif ti_ke_result == "体生用":
-            first = "客胜"
-            second = "平局"
-        elif ti_ke_result == "用生体":
-            first = "主胜"
-            second = "平局"
+    # 2. 六合卦加成（体生用/用克体时减半）
+    liuhe_bonus = 0.0
+    if is_liuhe:
+        if ti_ke_result in ["体生用", "用克体"]:
+            liuhe_bonus = 0.10  # 减半
+            details.append("六合卦加成：减半（体生用/用克体）")
         else:
+            liuhe_bonus = 0.20
+            details.append("六合卦加成：正常")
+    elif bian_gua in LIUHE_SET:
+        liuhe_bonus = 0.08
+        details.append("变卦六合加成：+0.08")
+    
+    # 3. 最终平局倾向
+    ping_ju_tend = min(ping_ju_base + liuhe_bonus, 0.88)
+    ping_ju_tend = max(0.10, ping_ju_tend)
+    
+    # 4. 首推判断
+    # 优先看体用生克（主判断）
+    if ti_ke_result == "用克体":
+        first = "客胜"
+        second = "平局"
+    elif ti_ke_result == "体克用":
+        first = "主胜"
+        second = "平局"
+    elif ti_ke_result == "体生用":
+        first = "客胜"
+        second = "平局"
+    elif ti_ke_result == "用生体":
+        first = "主胜"
+        second = "平局"
+    else:
+        # 比和或均衡时，看平局倾向
+        if ping_ju_tend > 0.55:
             first = "平局"
             second = "主胜" if score > 0 else "客胜"
+        elif score > 0:
+            first = "主胜"
+            second = "平局" if ping_ju_tend > 0.4 else "客胜"
+        else:
+            first = "客胜"
+            second = "平局" if ping_ju_tend > 0.4 else "主胜"
 
     return {
         "first": first,
@@ -392,7 +413,8 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         "gua_wuxing": gua_wuxing,
         "ji_xiong": ji_xiong,
         "ti_ke_result": ti_ke_result,
-        "is_liuhe": is_liuhe
+        "is_liuhe": is_liuhe,
+        "liuhe_bonus": liuhe_bonus
     }
 
 # ============================================================
@@ -484,6 +506,8 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("**五维推演**")
         st.caption(f"综合倾向：{five_dim['score']:+.2f}（正=主胜） | 平局倾向：{five_dim['ping_ju_tend']:.2f}")
+        if five_dim['is_liuhe']:
+            st.caption(f"六合卦加成：{five_dim['liuhe_bonus']:.2f}（{'减半' if five_dim['ti_ke_result'] in ['体生用','用克体'] else '正常'}）")
         
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
@@ -520,8 +544,7 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         st.markdown(f"**卦象**：{zhu} → {bian}　|　**动爻**：{dong}")
         st.caption(f"卦气：{five_dim['gua_wuxing']}（月建{five_dim['month_wuxing']}）")
         st.caption(f"卦名吉凶：{five_dim['ji_xiong']}")
-        if five_dim['is_liuhe']:
-            st.caption(f"六合卦加成：{'已减半（体生用/用克体）' if five_dim['ti_ke_result'] in ['体生用','用克体'] else '正常'}")
+        st.caption(f"体用生克关系：{five_dim['ti_ke_result']}")
         
         with st.expander("🔮 详细卦象解读（含逐爻详解）"):
             st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
@@ -542,4 +565,4 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
                 st.write(f"  - 爻位取象：{yao['爻位取象']}")
                 st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 起卦方式：主队名_客队名 → MD5哈希 → 定卦象 | 优化：六合卦平局加成减半 | 比分双方向输出")
+st.caption("💡 V6优化：体用生克优先 | 六合卦体生用/用克体时加成减半 | 平局倾向封顶0.88")
