@@ -577,7 +577,7 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         st.markdown("---")
         
         # ---- 结论区块 ----
-        st.markdown("### ✅ 修正后的完整结论")
+        st.markdown("### ✅ 推演结果如下")
         st.markdown("")
         
         # 首推/次推/比分
@@ -654,7 +654,7 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("---")
         
-        # ---- 五维推演详情（折叠，供深度查看） ----
+        # ---- 五维推演详情（折叠） ----
         with st.expander("🔮 五维推演详情"):
             st.markdown(f"**综合倾向**：{five_dim['score']:+.2f}（正=主胜） | **平局倾向**：{five_dim['ping_ju_tend']:.2f}")
             st.markdown(f"**原始卦象分**：{five_dim['score_original']:+.2f} | **实力修正**：{five_dim['correction']:+.2f}")
