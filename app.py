@@ -6,16 +6,16 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻·纯卦象预测 V8.2", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V8.2")
-st.caption("V8.2优化：基于102场实战校准 | 韩K联平局+15% | 芬超主场+35% | 挪超客场修正")
+st.set_page_config(page_title="⚽ 六爻·纯卦象预测 V8.7", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V8.7")
+st.caption("V8.7最终优化：欧战主场-25% | K联赛主场-18% | 挪超平局+15% | 解放者杯客场修正")
 
 # ============================================================
 # 2. 赛事列表
 # ============================================================
 LEAGUE_AVG_TOTAL = {
     "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
-    "欧冠": 2.6, "欧联": 2.5, "欧协联": 2.4,
+    "欧冠": 2.6, "欧联": 2.6, "欧协联": 2.5,
     "日职": 2.4, "日乙": 2.3, "K联赛": 2.3, "K2联赛": 2.2,
     "世界杯": 2.2, "亚洲杯": 2.2, "非洲杯": 2.1, "美洲杯": 2.3, "欧洲杯": 2.4,
     "国际友谊赛": 2.8, "芬超": 2.4, "芬甲": 2.3, "挪甲": 2.4,
@@ -27,7 +27,8 @@ LEAGUE_AVG_TOTAL = {
     "巴西乙": 2.3, "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
     "中超": 2.5, "澳超": 2.6, "沙特联": 2.5, "阿联酋超": 2.4,
     "卡塔尔联": 2.3, "女足世界杯": 2.0, "女足英超": 2.2,
-    "意乙": 2.3, "英冠": 2.5, "亚冠": 2.4,
+    "意乙": 2.3, "亚冠": 2.4, "英足总杯": 2.6, "解放者杯": 2.3,
+    "亚冠乙": 2.4,
 }
 
 # ============================================================
@@ -49,7 +50,7 @@ ZHAN_YI_LIST = [
 ]
 
 # ============================================================
-# 4. 球队实力分层（V8.2更新）
+# 4. 球队实力分层（V8.7校准）
 # ============================================================
 TEAM_STRENGTH = {
     # 超级强队 (5档)
@@ -57,38 +58,70 @@ TEAM_STRENGTH = {
     "德国": 5, "葡萄牙": 5, "比利时": 5, "荷兰": 5, "意大利": 5,
     "拜仁慕尼黑": 5, "巴黎圣日耳曼": 5, "皇家马德里": 5, "巴塞罗那": 5,
     "曼城": 5, "利物浦": 5, "阿森纳": 5, "国际米兰": 5,
+    "马德里竞技": 5, "勒沃库森": 5, "多特蒙德": 5,
+    "博德闪耀": 5,
     # 强队 (4档)
-    "尤文图斯": 4, "AC米兰": 4, "那不勒斯": 4, "多特蒙德": 4,
-    "莱比锡红牛": 4, "马德里竞技": 4, "毕尔巴鄂竞技": 4,
-    "比利亚雷亚尔": 4, "阿斯顿维拉": 4, "切尔西": 4, "曼联": 4, "热刺": 4,
+    "尤文图斯": 4, "AC米兰": 4, "那不勒斯": 4, "亚特兰大": 4,
+    "莱比锡红牛": 4, "塞维利亚": 4, "毕尔巴鄂竞技": 4,
+    "比利亚雷亚尔": 4, "阿斯顿维拉": 4, "切尔西": 4, "曼联": 4,
+    "热刺": 4, "纽卡斯尔联": 4, "西汉姆联": 4, "布伦特福德": 4,
     "克罗地亚": 4, "乌拉圭": 4, "瑞士": 4, "瑞典": 4, "丹麦": 4,
     "墨西哥": 4, "美国": 4, "塞内加尔": 4, "摩洛哥": 4, "日本": 4,
     "韩国": 4, "澳大利亚": 4, "尼日利亚": 4, "哥伦比亚": 4,
     "蔚山现代": 4, "全北现代": 4, "浦项制铁": 4,
-    "马尔默": 4, "赫尔辛基": 4, "莫尔德": 4, "博德闪耀": 4,
-    "利雅得胜利": 4, "吉达国民": 4, "水晶宫": 4,
-    # 中游队 (3档) - V8.2新增/调整
+    "马尔默": 4, "赫尔辛基": 4, "莫尔德": 4,
+    "利雅得胜利": 4, "吉达国民": 4, "吉达联合": 4, "水晶宫": 4,
+    "利雅得新月": 4, "大阪钢巴": 4, "神户胜利船": 4,
+    "皇家社会": 4, "里尔": 4, "波尔图": 4, "本菲卡": 4,
+    "里斯本竞技": 4, "罗马": 4, "拉齐奥": 4, "佛罗伦萨": 4,
+    "科林蒂安": 4, "帕尔梅拉斯": 4, "弗拉门戈": 4, "弗鲁米嫩塞": 4,
+    "博卡青年": 4, "河床": 4,
+    # 中游队 (3档)
     "厄瓜多尔": 3, "巴拉圭": 3, "智利": 3, "秘鲁": 3, "土耳其": 3,
     "奥地利": 3, "苏格兰": 3, "挪威": 3, "乌克兰": 3, "伊朗": 3,
     "沙特阿拉伯": 3, "卡塔尔": 3, "阿联酋": 3, "阿尔及利亚": 3,
     "科特迪瓦": 3, "加纳": 3, "埃及": 3, "突尼斯": 3,
-    "匈牙利": 3, "罗马尼亚": 3, "威尔士": 3,
+    "匈牙利": 3, "罗马尼亚": 3, "威尔士": 3, "希腊": 3, "黑山": 3,
+    "斯洛文尼亚": 3, "塞尔维亚": 3,
     "弗赖堡": 3, "布拉加": 3, "法兰克福": 3, "科隆": 3,
-    "巴列卡诺": 3, "阿尔克马尔": 3, "佛罗伦萨": 3,
+    "巴列卡诺": 3, "阿尔克马尔": 3,
     "首尔FC": 3, "江原FC": 3, "光州FC": 3, "釜山偶像": 3,
     "大田市民": 3, "水原三星": 3, "仁川联": 3,
     "韦斯特罗斯": 3, "天狼星": 3, "哥德堡": 3, "AIK索尔纳": 3,
-    "布兰": 3, "特罗姆瑟": 3, "奥卢": 3, "瓦萨": 3,
+    "布兰": 3, "特罗姆瑟": 3, "奥卢": 3, "瓦萨": 3, "萨普斯堡": 3,
+    "哈尔姆斯塔德": 3, "卡尔马": 3, "埃尔夫斯堡": 3, "赫根": 3,
+    "佐加顿斯": 3, "索尔纳": 3, "哈马比": 3,
+    "瓦勒伦加": 3, "维京": 3, "利勒斯特": 3, "奥勒松": 3,
+    "沙尔克": 3, "汉诺威": 3, "卡尔斯鲁厄": 3, "杜塞尔多夫": 3,
+    "特温特": 3, "乌德勒支": 3, "阿尔克马": 3, "前进之鹰": 3,
+    "伯恩茅斯": 3, "富勒姆": 3, "狼队": 3, "埃弗顿": 3,
+    "奥萨苏纳": 3, "赫塔费": 3, "巴伦西亚": 3, "埃尔切": 3,
+    "蒙彼利埃": 3, "兰斯": 3, "巴黎FC": 3,
+    "克雷莫纳": 3, "博洛尼亚": 3, "都灵": 3, "热那亚": 3,
+    "卡利亚里": 3, "萨索洛": 3, "乌迪内斯": 3, "帕尔马": 3,
+    "维罗纳": 3,
+    "水晶体育": 3, "麦德林": 3, "圣菲独立": 3, "门多萨独立": 3,
+    "瓜亚基尔": 3, "迈拉索尔": 3, "基多大学": 3,
     # 弱队 (2档)
     "新西兰": 2, "加拿大": 2, "佛得角": 2, "库拉索": 2,
     "波黑": 2, "斯洛伐克": 2, "捷克": 2, "南非": 2,
     "伊拉克": 2, "约旦": 2, "乌兹别克斯坦": 2, "巴拿马": 2,
-    "海地": 2, "刚果(金)": 2, "黑山": 2, "爱尔兰": 2,
-    "芬兰": 2, "安养FC": 2, "拉赫蒂": 2, "玛丽港": 2,
-    "哈卡": 2, "哈尔姆斯塔德": 2, "卡尔马": 2,
-    "克里斯蒂安松": 2, "桑德兰": 2, "利兹联": 2, "伯恩利": 2,
-    "莱万特": 2, "西班牙人": 2, "奥萨苏纳": 2, "马略卡": 2,
-    "仁川联": 2, "光州FC": 2,
+    "海地": 2, "刚果(金)": 2, "安养FC": 2, "富川FC": 2,
+    "拉赫蒂": 2, "玛丽港": 2, "哈卡": 2,
+    "桑德兰": 2, "利兹联": 2, "伯恩利": 2, "沃特福德": 2,
+    "莱万特": 2, "西班牙人": 2, "马略卡": 2, "阿拉维斯": 2,
+    "加的斯": 2, "奥维耶多": 2,
+    "科莫": 2, "莱切": 2, "比萨": 2, "恩波利": 2,
+    "赫尔城": 2, "牛津联": 2, "米尔沃尔": 2, "朴次茅斯": 2,
+    "伊普斯": 2, "布莱克本": 2, "西布朗": 2, "雷克斯汉姆": 2,
+    "斯旺西": 2, "伯明翰": 2, "诺维奇": 2, "考文垂": 2,
+    "赫尔城": 2, "女王巡游": 2, "米堡": 2,
+    "麦克阿瑟": 2, "纽卡斯托": 2, "阿德莱德联": 2, "西悉尼": 2,
+    "珀斯光荣": 2, "中央海岸": 2, "布里斯班": 2, "惠灵顿凤凰": 2,
+    "墨尔本胜利": 2, "奥克兰FC": 2, "悉尼FC": 2, "墨尔本城": 2,
+    "清水鼓动": 2, "町田泽维亚": 2, "京都不死鸟": 2, "名古屋鲸": 2,
+    "浦和红钻": 2, "鹿岛鹿角": 2,
+    "金泉尚武": 2, "安养FC": 2,
 }
 
 def get_strength(team):
@@ -100,7 +133,7 @@ def get_strength_label(score):
     return labels.get(score, "中游")
 
 # ============================================================
-# 5. 卦象数据（精简）
+# 5. 卦象数据
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行": "金", "比赛": "冠军、强势方、大胜"},
@@ -264,7 +297,7 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     return yao_list
 
 # ============================================================
-# 11. 五维推演 + 实力修正 + 联赛专属修正（V8.2）
+# 11. 五维推演 + 实力修正 + 联赛专属修正（V8.7最终版）
 # ============================================================
 def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
                             league, match_time=None, zhan_yi=1.0):
@@ -412,7 +445,7 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
     scores_detail["卦名吉凶"] = jx_score
 
     # ============================================================
-    # V8.2：实力修正 + 联赛专属修正（基于102场实战校准）
+    # V8.7：实力修正 + 联赛专属修正
     # ============================================================
     strength_h = get_strength(home_team)
     strength_a = get_strength(away_team)
@@ -443,9 +476,6 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
     if abs(correction) > 0.1:
         details.append(f"实力修正：{correction_reason}")
 
-    score_original = score
-    score = score + correction * 0.5
-
     # 特殊规则：用生体+客强 → 反转
     if ti_ke_result == "用生体" and strength_a - strength_h >= 1:
         score = -0.20
@@ -455,49 +485,156 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
         ti_ke_result_modified = ti_ke_result
 
     # ============================================================
-    # V8.2：赛事属性修正（基于102场实战校准）
+    # V8.7：联赛专属修正
     # ============================================================
     event_correction = 0
     home_advantage_mod = 1.0
 
+    # --- 国际友谊赛 ---
     if league == "国际友谊赛":
-        event_correction = 0.08
-        details.append("赛事属性修正：友谊赛(+0.08平局)")
+        event_correction = 0.15
+        home_advantage_mod = 1.20
+        if strength_h - strength_a >= 2:
+            correction = correction * 0.7
+        details.append("国际友谊赛(+0.15平局，强队优势打折)")
 
+    # --- K联赛（V8.7：主场优势进一步减弱）---
     elif league == "K联赛":
-        event_correction = 0.15  # V8.2: 0.10→0.15
-        home_advantage_mod = 0.82  # V8.2: 0.85→0.82
-        details.append("赛事属性修正：K联赛(+0.15平局，主场优势减弱)")
+        event_correction = 0.15
+        home_advantage_mod = 0.75  # 原0.82
+        details.append("K联赛(+0.15平局，主场优势进一步减弱)")
 
+    # --- 英冠 ---
+    elif league == "英冠":
+        event_correction = 0.12
+        details.append("英冠(+0.12平局)")
+
+    # --- 英超 ---
+    elif league == "英超":
+        event_correction = 0.08
+        if 3 <= strength_h <= 4 and strength_a >= strength_h:
+            home_advantage_mod = 1.20
+            details.append("英超中游球队主场优势增强")
+        if strength_h >= 4 and strength_a >= 4:
+            event_correction = 0.15
+        details.append(f"英超(+{event_correction:.2f}平局)")
+
+    # --- 西甲 ---
+    elif league == "西甲":
+        event_correction = 0.05
+        home_advantage_mod = 1.30
+        if strength_h <= 3 and strength_a >= 5:
+            if away_team in ["皇家马德里", "巴塞罗那"]:
+                score = score * 0.75
+                details.append("西甲超级强队客场修正：爆冷风险增加")
+        details.append("西甲(主场优势大幅增强)")
+
+    # --- 德甲 ---
+    elif league == "德甲":
+        event_correction = 0.05
+        home_advantage_mod = 1.10
+        if strength_h <= 3 and strength_a >= 5:
+            if away_team in ["拜仁慕尼黑", "多特蒙德", "勒沃库森"]:
+                score = score * 0.85
+                details.append("德甲超级强队客场修正")
+        details.append("德甲(主场优势增强)")
+
+    # --- 意甲 ---
+    elif league == "意甲":
+        event_correction = 0.08
+        home_advantage_mod = 1.10
+        details.append("意甲(+0.08平局)")
+
+    # --- 法甲 ---
+    elif league == "法甲":
+        event_correction = 0.05
+        home_advantage_mod = 1.10
+        details.append("法甲(主场优势增强)")
+
+    # --- 荷甲 ---
+    elif league == "荷甲":
+        event_correction = 0.05
+        home_advantage_mod = 1.10
+        details.append("荷甲(主场优势增强)")
+
+    # --- 荷乙 ---
+    elif league == "荷乙":
+        event_correction = 0.15
+        details.append("荷乙(+0.15平局)")
+
+    # --- 葡超 ---
+    elif league == "葡超":
+        home_advantage_mod = 0.95
+        details.append("葡超(主场优势减弱)")
+
+    # --- 法乙 ---
+    elif league == "法乙":
+        event_correction = 0.15
+        details.append("法乙(+0.15平局)")
+
+    # --- 澳超 ---
+    elif league == "澳超":
+        event_correction = 0.10
+        details.append("澳超(+0.10平局)")
+
+    # --- 挪超（V8.7：平局权重提升，主场优势减弱）---
+    elif league == "挪超":
+        event_correction = 0.15  # 原0.08
+        home_advantage_mod = 0.85  # 原0.90
+        details.append("挪超(+0.15平局，主场优势减弱)")
+
+    # --- 瑞典超 ---
+    elif league == "瑞典超":
+        event_correction = 0.08
+        details.append("瑞典超(+0.08平局)")
+
+    # --- 芬超 ---
     elif league == "芬超":
         event_correction = -0.05
-        home_advantage_mod = 1.35  # V8.2: 1.25→1.35
-        details.append("赛事属性修正：芬超(主场优势大幅增强)")
+        home_advantage_mod = 1.35
+        details.append("芬超(主场优势大幅增强)")
 
-    elif league == "瑞典超":
-        event_correction = 0.05
-        details.append("赛事属性修正：瑞典超(+0.05平局)")
+    # --- 亚冠/亚冠乙 ---
+    elif league in ["亚冠", "亚冠乙"]:
+        event_correction = 0.12
+        details.append("亚冠(+0.12平局，冷门风险高)")
 
-    elif league == "挪超":
-        event_correction = 0.05
-        # V8.2新增：挪超客场强队修正
-        details.append("赛事属性修正：挪超(+0.05平局，客场强队需关注)")
+    # --- 沙特联（V8.7：平局权重提升）---
+    elif league == "沙特联":
+        event_correction = 0.12
+        details.append("沙特联(+0.12平局)")
 
+    # --- 解放者杯（V8.7：主场优势增强，客场强队修正）---
+    elif league == "解放者杯":
+        event_correction = 0.10
+        home_advantage_mod = 1.25
+        if strength_a - strength_h >= 2:
+            correction = correction * 0.6
+            details.append("解放者杯客场强队修正：客场难度大")
+        details.append("解放者杯(主场优势增强)")
+
+    # --- 欧冠淘汰赛（V8.7：主场优势下调）---
+    elif league == "欧冠" and zhan_yi >= 1.2:
+        event_correction = 0.12
+        home_advantage_mod = 1.10  # 原1.30
+        details.append("欧冠淘汰赛(主场优势减弱，客场强队需重视)")
+
+    # --- 欧联/欧协联淘汰赛（V8.7：主场优势大幅下调）---
+    elif league in ["欧联", "欧协联"] and zhan_yi >= 1.2:
+        home_advantage_mod = 1.05  # 原1.30
+        event_correction = 0.15
+        details.append("欧联/欧协联淘汰赛(主场优势大幅减弱，客场强队更可靠)")
+
+    # --- 世界杯淘汰赛 ---
     elif league == "世界杯" and zhan_yi >= 1.2:
         event_correction += 0.10
-        details.append("赛事属性修正：淘汰赛(+0.10平局)")
+        details.append("世界杯淘汰赛(+0.10平局)")
 
     # 应用赛事属性修正
     score = score - event_correction * 0.3
 
-    # V8.2新增：挪超客场强队特殊处理
-    if league == "挪超" and strength_a > strength_h and strength_a >= 4:
-        if away_team in ["莫尔德", "博德闪耀", "特罗姆瑟"]:
-            score -= 0.10
-            details.append("挪超特殊修正：客场强队更有利")
-
     # ============================================================
-    # V8.2：淘汰赛预警
+    # V8.7：淘汰赛预警
     # ============================================================
     penalty_warning = ""
     is_knockout = zhan_yi >= 1.2 and league in ["欧冠", "欧联", "欧协联", "世界杯", "亚冠"]
@@ -528,8 +665,14 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
 
     # 赛事属性修正平局倾向
     if league == "国际友谊赛":
-        liuhe_bonus += 0.08
-    if league == "K联赛":
+        liuhe_bonus += 0.15
+    if league in ["K联赛", "英冠", "荷乙", "法乙", "亚冠", "亚冠乙", "沙特联"]:
+        liuhe_bonus += 0.12
+    if league == "挪超":
+        liuhe_bonus += 0.15
+    if league == "英超" and strength_h >= 4 and strength_a >= 4:
+        liuhe_bonus += 0.15
+    if league in ["欧联", "欧协联"] and zhan_yi >= 1.2:
         liuhe_bonus += 0.15
     if is_knockout and abs(strength_h - strength_a) <= 1:
         liuhe_bonus += 0.10
@@ -688,7 +831,7 @@ zhan_yi = zhan_yi_opt[1]
 # ============================================================
 # 14. 预测按钮
 # ============================================================
-if st.button("🚀 纯卦象预测 V8.2", type="primary", use_container_width=True):
+if st.button("🚀 纯卦象预测 V8.7", type="primary", use_container_width=True):
     if not home_team.strip() or not away_team.strip():
         st.warning("⚠️ 请输入主队名和客队名！")
     else:
@@ -798,4 +941,4 @@ if st.button("🚀 纯卦象预测 V8.2", type="primary", use_container_width=Tr
                 st.write(f"  - 爻位取象：{yao['爻位取象']}")
                 st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 V8.2优化：基于102场实战校准 | 韩K联平局+15% | 芬超主场+35% | 挪超客场修正")
+st.caption("💡 V8.7最终优化：欧战主场-25% | K联赛主场-18% | 挪超平局+15% | 解放者杯客场修正")
