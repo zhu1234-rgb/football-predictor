@@ -6,9 +6,9 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 v-1（确定性版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 v-1")
-st.caption("确定性版本 · 结果固定 · 与对话推演完全同步")
+st.set_page_config(page_title="⚽ 六爻预测 v-1（日期版）", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 v-1（日期版）")
+st.caption("起卦只依赖日期，不依赖具体时间，确保同一日比赛结果固定")
 
 # ============================================================
 # 2. 联赛基准进球（完整版）
@@ -146,10 +146,12 @@ def wuxing_sheng_ke(wo, ta):
     else: return 0.0
 
 # ============================================================
-# 5. 确定性起卦（基于 MD5 哈希）
+# 5. 确定性起卦（只依赖日期，忽略具体时间）
 # ============================================================
 def get_team_seed(team, league, date_str):
-    raw = f"{team}_{league}_{date_str}"
+    # 只取日期部分（前5个字符，如 "07-06"）
+    date_only = date_str[:5] if len(date_str) >= 5 else date_str
+    raw = f"{team}_{league}_{date_only}"
     return int(hashlib.md5(raw.encode()).hexdigest(), 16) % 1000000
 
 def auto_gua(team1, team2, league, date_str):
@@ -160,7 +162,7 @@ def auto_gua(team1, team2, league, date_str):
     return zhu, bian, dong
 
 # ============================================================
-# 6. 核心预测函数（v-1 确定性版）
+# 6. 核心预测函数（v-1 日期版）
 # ============================================================
 def predict_match(league, date_time, home, away):
     league_key = league.strip()
@@ -169,7 +171,7 @@ def predict_match(league, date_time, home, away):
     away_str = get_strength(away)
     diff = home_str - away_str
 
-    # ---- 自动识别修正标签（v-1 版本） ----
+    # ---- 自动识别修正标签 ----
     extra = []
     if home_str <= 2 and "05" in date_time: extra.append("保级")
     if away_str <= 2 and "05" in date_time: extra.append("保级客场")
@@ -178,7 +180,7 @@ def predict_match(league, date_time, home, away):
     if "季后赛" in league_key: extra.append("季后赛")
     if "淘汰赛" in league_key: extra.append("淘汰赛")
 
-    # ---- 起卦 ----
+    # ---- 起卦（日期版） ----
     zhu, bian, dong = auto_gua(home, away, league_key, date_time)
     gua_ji = get_gua_ji_xiong(zhu)
     wuxing = wuxing_sheng_ke(
@@ -224,7 +226,7 @@ def predict_match(league, date_time, home, away):
 
     exp = max(exp, 1.0)
 
-    # ---- 确定性比分离散化（枚举排序） ----
+    # ---- 确定性比分离散化 ----
     total = exp
     home_ratio = 0.5 + diff * 0.05
     home_ratio = max(0.3, min(0.7, home_ratio))
@@ -283,7 +285,7 @@ def predict_match(league, date_time, home, away):
         conf = min(conf, 75)
     if league_key == "美职联": conf = min(conf, 45)
 
-    # ---- 方向强制修正（保底规则） ----
+    # ---- 方向强制修正 ----
     if league_key=="英超" and home_str<=2 and away_str>=4:
         if first_res != "平局" and second_res != "平局": second_res = "平局"
     if away_str==5 and first_res!="平局" and second_res!="平局": second_res = "平局"
@@ -310,6 +312,7 @@ def predict_match(league, date_time, home, away):
 def main():
     st.markdown("""
     **输入格式**：每行 `联赛，日期时间，主队 vs 客队`  
+    **注意**：时间中的分钟不影响结果（只取日期部分）。  
     示例：`挪甲，07-05 00:00，奥德 vs 海于格松`
     """)
     user_input = st.text_area("📝 粘贴比赛列表", height=300)
