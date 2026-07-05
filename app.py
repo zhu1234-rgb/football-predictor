@@ -1,7 +1,5 @@
 import streamlit as st
-import math
 import hashlib
-from datetime import datetime
 
 # ============================================================
 # 1. 页面配置
@@ -11,7 +9,7 @@ st.title("⚽ 六爻 · 梅花易数 · 足球预测引擎")
 st.caption("融合《梅花易数》《卦辞》《六爻心源》逐爻详解")
 
 # ============================================================
-# 2. 六十四卦卦名列表（与原有保持一致）
+# 2. 六十四卦基础数据
 # ============================================================
 GUA_LIST = [
     "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
@@ -21,9 +19,6 @@ GUA_LIST = [
     "涣","节","中孚","小过","既济","未济"
 ]
 
-# ============================================================
-# 3. 卦辞字典（从《卦辞.pdf》提取，每个卦的卦辞）
-# ============================================================
 GUA_CI = {
     "乾": "元，亨，利，贞。",
     "坤": "元亨，利牝马之贞。君子有攸往，先迷后得主，利西南得朋，东北丧朋。安贞吉。",
@@ -91,9 +86,6 @@ GUA_CI = {
     "未济": "亨。小狐汔济，濡其尾，无攸利。"
 }
 
-# ============================================================
-# 4. 爻辞字典（每个卦的六条爻辞，按初爻到上爻）
-# ============================================================
 YAO_CI = {
     "乾": ["潜龙勿用。", "见龙在田，利见大人。", "君子终日乾乾，夕惕若厉，无咎。", "或跃在渊，无咎。", "飞龙在天，利见大人。", "亢龙有悔。"],
     "坤": ["履霜，坚冰至。", "直方大，不习无不利。", "含章可贞，或从王事，无成有终。", "括囊，无咎无誉。", "黄裳，元吉。", "龙战于野，其血玄黄。"],
@@ -161,9 +153,6 @@ YAO_CI = {
     "未济": ["濡其尾，吝。", "曳其轮，贞吉。", "未济，征凶，利涉大川。", "贞吉，悔亡，震用伐鬼方，三年有赏于大国。", "贞吉，无悔。君子之光，有孚，吉。", "有孚于饮酒，无咎。濡其首，有孚失是。"]
 }
 
-# ============================================================
-# 5. 八卦五行与类象（原有扩充）
-# ============================================================
 GUA_LEI_XIANG = {
     "乾":{"五行":"金","比赛":"冠军","足球":"主帅"},
     "坤":{"五行":"土","比赛":"防守","足球":"后防"},
@@ -174,6 +163,7 @@ GUA_LEI_XIANG = {
     "艮":{"五行":"土","比赛":"铁桶","足球":"后卫"},
     "兑":{"五行":"金","比赛":"突破","足球":"边翼卫"}
 }
+
 GUA_JI_XIONG = {
     "泰":"大吉，主队有利","否":"大凶，客队有利","谦":"大吉，主队有利",
     "豫":"吉，主队有利","随":"吉，主队有利","蛊":"凶，客队有利",
@@ -196,75 +186,168 @@ GUA_JI_XIONG = {
 }
 
 # ============================================================
-# 6. 起卦函数（保留原有MD5方式，但增加起卦说明）
+# 3. 纳甲数据库构建（京房纳甲体系）
 # ============================================================
-def get_team_seed(team, league, date_str):
-    raw = f"{team}_{league}_{date_str}"
+GONG_DATA = {
+    "乾": {"五行": "金", "阴阳": "阳", "地支顺序": ["子", "寅", "辰", "午", "申", "戌"]},
+    "震": {"五行": "木", "阴阳": "阳", "地支顺序": ["子", "寅", "辰", "午", "申", "戌"]},
+    "坎": {"五行": "水", "阴阳": "阳", "地支顺序": ["寅", "辰", "午", "申", "戌", "子"]},
+    "艮": {"五行": "土", "阴阳": "阳", "地支顺序": ["辰", "午", "申", "戌", "子", "寅"]},
+    "坤": {"五行": "土", "阴阳": "阴", "地支顺序": ["未", "巳", "卯", "丑", "亥", "酉"]},
+    "巽": {"五行": "木", "阴阳": "阴", "地支顺序": ["丑", "亥", "酉", "未", "巳", "卯"]},
+    "离": {"五行": "火", "阴阳": "阴", "地支顺序": ["卯", "丑", "亥", "酉", "未", "巳"]},
+    "兑": {"五行": "金", "阴阳": "阴", "地支顺序": ["巳", "卯", "丑", "亥", "酉", "未"]},
+}
+
+GONG_GUA = {
+    "乾": ["乾", "姤", "遁", "否", "观", "剥", "晋", "大有"],
+    "震": ["震", "豫", "解", "恒", "升", "井", "大过", "随"],
+    "坎": ["坎", "节", "屯", "既济", "革", "丰", "明夷", "师"],
+    "艮": ["艮", "贲", "大畜", "损", "睽", "履", "中孚", "渐"],
+    "坤": ["坤", "复", "临", "泰", "大壮", "夬", "需", "比"],
+    "巽": ["巽", "小畜", "家人", "益", "无妄", "噬嗑", "颐", "蛊"],
+    "离": ["离", "旅", "鼎", "未济", "蒙", "涣", "讼", "同人"],
+    "兑": ["兑", "困", "萃", "咸", "蹇", "谦", "小过", "归妹"],
+}
+
+DIZHI_WUXING = {
+    "子": "水", "丑": "土", "寅": "木", "卯": "木", "辰": "土", "巳": "火",
+    "午": "火", "未": "土", "申": "金", "酉": "金", "戌": "土", "亥": "水"
+}
+
+def get_qin(shi_wuxing, yao_wuxing):
+    sheng = {"金":"水", "水":"木", "木":"火", "火":"土", "土":"金"}
+    ke = {"金":"木", "木":"土", "土":"水", "水":"火", "火":"金"}
+    if yao_wuxing == shi_wuxing:
+        return "兄弟"
+    if sheng[shi_wuxing] == yao_wuxing:
+        return "子孙"
+    if sheng[yao_wuxing] == shi_wuxing:
+        return "父母"
+    if ke[shi_wuxing] == yao_wuxing:
+        return "妻财"
+    if ke[yao_wuxing] == shi_wuxing:
+        return "官鬼"
+    return "兄弟"
+
+def build_na_jia_db():
+    db = {}
+    for gong, gua_list in GONG_GUA.items():
+        gong_data = GONG_DATA[gong]
+        gong_wuxing = gong_data["五行"]
+        gong_yin_yang = gong_data["阴阳"]
+        if gong_yin_yang == "阳":
+            inner = gong_data["地支顺序"][0:3]
+            outer = gong_data["地支顺序"][3:6]
+        else:
+            inner = gong_data["地支顺序"][2::-1]
+            outer = gong_data["地支顺序"][5:2:-1]
+        for idx, gua_name in enumerate(gua_list):
+            if idx == 0:
+                shi = 6
+            elif idx == 1:
+                shi = 1
+            elif idx == 2:
+                shi = 2
+            elif idx == 3:
+                shi = 3
+            elif idx == 4:
+                shi = 4
+            elif idx == 5:
+                shi = 5
+            elif idx == 6:
+                shi = 4
+            elif idx == 7:
+                shi = 3
+            else:
+                shi = 6
+            ying = (shi + 3) if shi <= 3 else (shi - 3)
+            yao_dizhi = []
+            for i in range(6):
+                if i < 3:
+                    dz = inner[i]
+                else:
+                    dz = outer[i-3]
+                yao_dizhi.append(dz)
+            shi_dz = yao_dizhi[shi-1]
+            shi_wuxing = DIZHI_WUXING[shi_dz]
+            yao_qin = []
+            for dz in yao_dizhi:
+                wx = DIZHI_WUXING[dz]
+                qin = get_qin(shi_wuxing, wx)
+                yao_qin.append(qin)
+            db[gua_name] = {
+                "shi": shi,
+                "ying": ying,
+                "yao": list(zip(yao_dizhi, yao_qin))
+            }
+    return db
+
+NA_JIA_DB = build_na_jia_db()
+
+# ============================================================
+# 4. 起卦函数
+# ============================================================
+def get_team_seed(team, date_str):
+    raw = f"{team}_{date_str}"
     return int(hashlib.md5(raw.encode()).hexdigest(), 16) % 1000000
 
-def auto_gua(team1, team2, league, date_str):
-    seed = get_team_seed(team1, league, date_str) + get_team_seed(team2, league, date_str)
+def auto_gua(team1, team2, date_str):
+    seed = get_team_seed(team1, date_str) + get_team_seed(team2, date_str)
     zhu = GUA_LIST[seed % 64]
     bian = GUA_LIST[(seed // 64) % 64]
-    dong = seed % 6 + 1  # 1~6
-    return zhu, bian, dong
+    dong = seed % 6 + 1
+    yao_bits = [(seed >> i) & 1 for i in range(6)]
+    zhu_na = NA_JIA_DB[zhu]
+    bian_na = NA_JIA_DB[bian]
+    return zhu, bian, dong, yao_bits, zhu_na, bian_na
 
-# ============================================================
-# 7. 辅助函数：获取卦辞、爻辞
-# ============================================================
+def get_liu_shen(seed):
+    liu_shen_list = ["青龙", "朱雀", "勾陈", "螣蛇", "白虎", "玄武"]
+    start = seed % 6
+    result = []
+    for i in range(6):
+        result.append(liu_shen_list[(start + i) % 6])
+    return result
+
 def get_gua_ci(gua):
     return GUA_CI.get(gua, "（卦辞暂无）")
 
 def get_yao_ci(gua, dong):
-    # dong 1~6
     yao_list = YAO_CI.get(gua, [""]*6)
     if dong <= len(yao_list):
         return yao_list[dong-1]
-    else:
-        return "（爻辞暂无）"
+    return "（爻辞暂无）"
 
 # ============================================================
-# 8. 核心预测与解卦函数
+# 5. 核心预测函数
 # ============================================================
-def predict_match(league, date_time, home, away):
-    # --- 起卦 ---
-    zhu, bian, dong = auto_gua(home, away, league, date_time)
-    
-    # --- 构建解卦详情 ---
+def predict_match(date_time, home, away):
+    zhu, bian, dong, yao_bits, zhu_na, bian_na = auto_gua(home, away, date_time)
+    seed = get_team_seed(home, date_time) + get_team_seed(away, date_time)
+    liu_shen = get_liu_shen(seed)
+
     detail = []
     detail.append("## 📜 起卦过程")
-    detail.append(f"- **起卦依据**：根据主队名 `{home}`、客队名 `{away}`、联赛 `{league}`、比赛时间 `{date_time}` 生成哈希种子，得主卦、变卦及动爻。")
+    detail.append(f"- **起卦依据**：根据主队名 `{home}`、客队名 `{away}`、比赛时间 `{date_time}` 生成哈希种子，得主卦、变卦及动爻。")
     detail.append(f"- **主卦**：{zhu} 卦")
     detail.append(f"- **变卦**：{bian} 卦")
     detail.append(f"- **动爻**：第 {dong} 爻（{'初爻' if dong==1 else '二爻' if dong==2 else '三爻' if dong==3 else '四爻' if dong==4 else '五爻' if dong==5 else '上爻'}）")
-    
-    # --- 卦辞 ---
+
     zhu_ci = get_gua_ci(zhu)
     bian_ci = get_gua_ci(bian)
-    yao_ci = get_yao_ci(zhu, dong)  # 动爻爻辞取自本卦
+    yao_ci = get_yao_ci(zhu, dong)
     detail.append("")
     detail.append("## 📖 卦辞与爻辞")
     detail.append(f"**主卦《{zhu}》卦辞**：{zhu_ci}")
     detail.append(f"**变卦《{bian}》卦辞**：{bian_ci}")
     detail.append(f"**动爻（第{dong}爻）爻辞**：{yao_ci}")
-    
-    # --- 体用生克（梅花易数） ---
-    # 体卦取上卦（客队），用卦取下卦（主队）？传统体用：不动为体，动爻所在卦为用。
-    # 我们简化：体卦代表主队，用卦代表客队。用本卦上下卦五行。
-    # 获取本卦上下卦（从卦名反推上下卦，由于没有完整映射，我们根据卦名在GUA_LIST中的索引，但GUA_LIST是按易经顺序，不是上下卦结构。
-    # 为了演示，我们固定：体=下卦，用=上卦（或反之）。这里我们取体=主队（下卦），用=客队（上卦）。
-    # 但需要知道本卦上下卦分别是什么。我们利用GUA_LIST索引，但无法直接推。我们简化：本卦的五行取自GUA_LEI_XIANG，但那是单卦的五行，不是组合。
-    # 我们直接使用《梅花易数》体用生克：用卦（上卦）的五行与体卦（下卦）的五行相生相克。
-    # 我们取本卦的上下卦：从六十四卦的构成看，本卦由两个单卦组成，但无法从卦名直接得到。我们暂时用zhu的五行作为体（主队），用bian的五行作为用（客队），但不如直接用GUA_LEI_XIANG中zhu的五行和bian的五行来判断。
-    # 更合理：体=主队五行=GUA_LEI_XIANG[zhu]["五行"]，用=客队五行=GUA_LEI_XIANG[bian]["五行"]。
-    # 这样虽然不严谨，但可体现生克。
+
     ti_wuxing = GUA_LEI_XIANG.get(zhu, {"五行":"土"})["五行"]
     yong_wuxing = GUA_LEI_XIANG.get(bian, {"五行":"土"})["五行"]
-    
-    # 五行生克规则
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
     ke = {"金":"木","木":"土","土":"水","水":"火","火":"金"}
-    
+
     if ti_wuxing == yong_wuxing:
         shengke = "比和"
         shengke_desc = "体用五行相同，为比和之象，主平和，比赛可能胶着，平局概率较高。"
@@ -283,15 +366,14 @@ def predict_match(league, date_time, home, away):
     else:
         shengke = "无特殊"
         shengke_desc = "五行关系不明显，需结合卦辞综合判断。"
-    
+
     detail.append("")
     detail.append("## ⚖️ 体用生克分析（梅花易数）")
     detail.append(f"- **体卦（代表主队）**：{zhu}（五行{ti_wuxing}）")
     detail.append(f"- **用卦（代表客队）**：{bian}（五行{yong_wuxing}）")
     detail.append(f"- **生克关系**：{shengke}")
     detail.append(f"- **解读**：{shengke_desc}")
-    
-    # --- 六亲映射（参考《六爻心源》六亲类象，映射足球） ---
+
     detail.append("")
     detail.append("## 🧑‍🤝‍🧑 六亲映射（足球对应）")
     detail.append("根据《六爻心源》，六亲可对应比赛要素：")
@@ -301,33 +383,25 @@ def predict_match(league, date_time, home, away):
     detail.append("- **父母**：战术体系、防守阵型、教练、俱乐部")
     detail.append("- **兄弟**：拼抢、消耗、犯规、竞争")
     detail.append("- **世爻**：主队自身，应爻：客队")
-    # 我们简单根据本卦和变卦来映射（此处略，仅作展示）
-    
-    # --- 综合吉凶（原有GUA_JI_XIONG） ---
+
     ji_xiong = GUA_JI_XIONG.get(zhu, "中，常规卦象")
     detail.append("")
     detail.append("## 🔮 卦象吉凶（本卦）")
     detail.append(f"- **{zhu}卦**：{ji_xiong}")
-    
-    # --- 结合体用生克修正方向 ---
-    # 原有逻辑根据卦名吉凶定主客优势，现在结合体用生克
-    # 我们设定一个倾向分数：主队优势 = 0
-    # 根据吉凶和生克调整
-    base_home = 0.5  # 默认五五开
+
+    base_home = 0.5
     if "主队有利" in ji_xiong:
         base_home += 0.1
     elif "客队有利" in ji_xiong:
         base_home -= 0.1
     elif "平局倾向" in ji_xiong:
         base_home = 0.5
-    # 根据生克调整
     if shengke == "用生体" or shengke == "体克用":
         base_home += 0.15
     elif shengke == "体生用" or shengke == "用克体":
         base_home -= 0.15
     base_home = max(0.2, min(0.8, base_home))
-    
-    # 总进球：根据体用生克和吉凶调整，但保持稳定
+
     total = 2.5
     if "大吉" in ji_xiong or "吉" in ji_xiong:
         total += 0.3
@@ -338,11 +412,10 @@ def predict_match(league, date_time, home, away):
     elif shengke in ["体生用", "用克体"]:
         total -= 0.2
     total = max(1.8, min(3.5, total))
-    
+
     home_exp = total * base_home
     away_exp = total * (1 - base_home)
-    
-    # --- 比分离散化（原代码逻辑） ---
+
     candidates = []
     for h in range(8):
         for a in range(8):
@@ -368,7 +441,7 @@ def predict_match(league, date_time, home, away):
     best = unique[:4]
     first_score = best[0]
     second_score = best[1] if len(best) > 1 else first_score
-    
+
     def res(h,a):
         if h>a: return "主胜"
         elif h<a: return "客胜"
@@ -381,8 +454,7 @@ def predict_match(league, date_time, home, away):
             second_res = res(second_score[0], second_score[1])
         else:
             second_res = "平局" if first_res != "平局" else "客胜"
-    
-    # --- 置信度 ---
+
     conf = int((0.6 if "吉" in ji_xiong else 0.4 if "凶" in ji_xiong else 0.5) * 100)
     if shengke in ["用生体", "体克用"]:
         conf += 10
@@ -391,8 +463,7 @@ def predict_match(league, date_time, home, away):
     conf = max(30, min(90, conf))
     if first_res == "平局":
         conf = max(conf - 5, 20)
-    
-    # --- 组装结果 ---
+
     result = {
         "zhu": zhu,
         "bian": bian,
@@ -407,52 +478,119 @@ def predict_match(league, date_time, home, away):
         "shengke_desc": shengke_desc,
         "yao_ci": yao_ci,
         "zhu_ci": zhu_ci,
-        "bian_ci": bian_ci
+        "bian_ci": bian_ci,
+        "zhu_na": zhu_na,
+        "bian_na": bian_na,
+        "yao_bits": yao_bits,
+        "liu_shen": liu_shen,
     }
     return result
 
 # ============================================================
-# 9. Streamlit 界面
+# 6. 显示函数
+# ============================================================
+def draw_gua_table(na_data, yao_bits, dong, liu_shen, title):
+    lines = []
+    lines.append(f"#### {title}")
+    lines.append("| 爻位 | 阴阳 | 地支 | 六亲 | 六神 | 标记 |")
+    lines.append("|------|------|------|------|------|------|")
+    shi = na_data["shi"]
+    ying = na_data["ying"]
+    for i in range(5, -1, -1):
+        pos = i + 1
+        yin_yang = "———" if yao_bits[i] == 1 else "— —"
+        dz, qin = na_data["yao"][i]
+        ls = liu_shen[i]
+        mark = ""
+        if pos == shi:
+            mark = "世"
+        if pos == ying:
+            mark += "应" if not mark else " 应"
+        if pos == dong:
+            mark += " ★动" if not mark else " ★动"
+        mark = mark.strip()
+        lines.append(f"| {pos}爻 | {yin_yang} | {dz} | {qin} | {ls} | {mark} |")
+    return "\n".join(lines)
+
+def display_result(result, date_time, home, away):
+    st.markdown(f"### 📊 {date_time}  {home} vs {away}")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("首推方向", result["first_res"])
+    col2.metric("次推方向", result["second_res"])
+    col3.metric("预测比分", f"{result['first_score'][0]}-{result['first_score'][1]}")
+    col4.metric("置信度", f"{result['conf']}%")
+
+    with st.expander("📜 查看逐爻详细解卦过程", expanded=True):
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.markdown(draw_gua_table(
+                result["zhu_na"],
+                result["yao_bits"],
+                result["dong"],
+                result["liu_shen"],
+                f"主卦 {result['zhu']}"
+            ))
+        with col_right:
+            bian_bits = result["yao_bits"].copy()
+            bian_bits[result["dong"]-1] = 1 - bian_bits[result["dong"]-1]
+            st.markdown(draw_gua_table(
+                result["bian_na"],
+                bian_bits,
+                None,
+                result["liu_shen"],
+                f"变卦 {result['bian']}"
+            ))
+        st.markdown(result["detail"])
+        st.caption("（解卦融合了卦辞、爻辞、体用生克及六亲映射，仅供参考）")
+
+# ============================================================
+# 7. 主界面
 # ============================================================
 def main():
     st.markdown("""
-    **输入格式**：每行 `联赛，日期时间，主队 vs 客队`  
-    示例：`J联赛，05-22 18:30，町田泽维亚 vs 浦和红钻`
-    
-    **支持的联赛**：任意联赛（仅用于起卦种子，不影响解卦）
+    **输入方式：**  
+    ① **单场预测**：直接填写主队、客队、比赛时间，点击预测。  
+    ② **批量预测**：点击下方“批量输入”展开，粘贴多场比赛列表（每行格式：`时间，主队 vs 客队`）。
     """)
-    user_input = st.text_area("📝 粘贴比赛列表", height=200)
-    if st.button("🚀 预测并显示解卦过程", type="primary"):
-        if not user_input.strip():
-            st.warning("请输入至少一场比赛")
-            return
-        lines = user_input.strip().split('\n')
-        for line in lines:
-            if not line.strip(): continue
-            parts = line.split('，')
-            if len(parts)<3:
-                st.error(f"格式错误：{line}")
-                continue
-            league, date_time, teams = parts[0].strip(), parts[1].strip(), parts[2].strip()
-            if ' vs ' not in teams:
-                st.error(f"缺少 vs 分隔：{line}")
-                continue
-            home, away = teams.split(' vs ')
-            result = predict_match(league, date_time, home, away)
-            
-            # 显示结果概览
-            st.markdown(f"### 📊 {league} {date_time}  {home} vs {away}")
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("首推方向", result["first_res"])
-            col2.metric("次推方向", result["second_res"])
-            col3.metric("预测比分", f"{result['first_score'][0]}-{result['first_score'][1]}")
-            col4.metric("置信度", f"{result['conf']}%")
-            
-            # 显示详细解卦过程（可折叠）
-            with st.expander("📜 查看逐爻详细解卦过程", expanded=True):
-                st.markdown(result["detail"])
-                st.caption("（解卦融合了卦辞、爻辞、体用生克及六亲映射，仅供参考）")
-            st.divider()
+    
+    with st.form("single_match_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            home = st.text_input("🏠 主队", value="曼联")
+            away = st.text_input("✈️ 客队", value="利物浦")
+        with col2:
+            date_time = st.text_input("📅 比赛时间", value="05-22 18:30", help="格式：月-日 时:分，例如 05-22 18:30")
+        submitted = st.form_submit_button("🚀 预测并显示解卦过程")
+        if submitted:
+            if not home or not away or not date_time:
+                st.warning("请完整填写主队、客队和比赛时间")
+            else:
+                result = predict_match(date_time, home, away)
+                display_result(result, date_time, home, away)
+    
+    with st.expander("📋 批量输入（粘贴多场比赛）"):
+        st.markdown("每行格式：`时间，主队 vs 客队`，例如：")
+        st.code("05-22 18:30，町田泽维亚 vs 浦和红钻")
+        user_input = st.text_area("粘贴比赛列表", height=200)
+        if st.button("批量预测"):
+            if not user_input.strip():
+                st.warning("请至少输入一场比赛")
+            else:
+                lines = user_input.strip().split('\n')
+                for line in lines:
+                    if not line.strip(): continue
+                    parts = line.split('，')
+                    if len(parts) < 2:
+                        st.error(f"格式错误：{line}（需要 时间，主队 vs 客队）")
+                        continue
+                    date_time, teams = parts[0].strip(), parts[1].strip()
+                    if ' vs ' not in teams:
+                        st.error(f"缺少 vs 分隔：{line}")
+                        continue
+                    home, away = teams.split(' vs ')
+                    result = predict_match(date_time, home, away)
+                    st.markdown("---")
+                    display_result(result, date_time, home, away)
 
 if __name__ == "__main__":
     main()
