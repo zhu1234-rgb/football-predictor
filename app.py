@@ -197,58 +197,30 @@ STANDARD_SCORES = {
 }
 
 def get_closest_scores(home_exp, away_exp, total_exp, num=4):
-    """
-    根据期望主客进球，从标准比分列表中选取最匹配的若干个比分。
-    返回列表，每个元素为 (比分, 距离)
-    """
     all_scores = []
     for result_type, scores in STANDARD_SCORES.items():
         for s in scores:
             if "其它" in s:
-                # 对于“其它”，我们根据方向确定一个大致的范围
-                # 暂时跳过，后面单独处理
                 continue
             h, a = map(int, s.split(':'))
-            # 计算距离（欧氏距离 + 总进球偏差）
             dist = ((h - home_exp)**2 + (a - away_exp)**2)**0.5
-            # 对常见比分微调（给与奖励）
             if (h,a) in [(2,0),(0,2),(2,1),(1,2),(3,1),(1,3),(1,0),(0,1),(2,2),(1,1),(0,0)]:
-                dist *= 0.9  # 常见比分优先
+                dist *= 0.9
             all_scores.append((s, dist, result_type))
-    # 排序
     all_scores.sort(key=lambda x: x[1])
-    # 取前num个
     top = all_scores[:num]
-    # 检查是否需要补充“其它”
-    # 如果前num个里没有“其它”，但总进球很大，可以追加一个“其它”
-    # 简单处理：如果总进球 > 5 且未出现“其它”，添加一个相应方向的“其它”
-    # 判断方向
+    # 处理“其它”
     if home_exp > away_exp:
         result_type = "主胜"
     elif home_exp < away_exp:
         result_type = "客胜"
     else:
         result_type = "平局"
-    # 检查是否已有该方向的“其它”
     has_other = any(s.endswith("其它") for s, _, _ in top)
     if not has_other and total_exp >= 5:
-        # 添加一个“其它”
         other_score = f"{result_type}其它"
-        # 计算一个大概的期望比分（比如总进球分配给主客）
-        if result_type == "主胜":
-            h = int(home_exp + 1)
-            a = int(away_exp)
-        elif result_type == "客胜":
-            h = int(home_exp)
-            a = int(away_exp + 1)
-        else:
-            h = int(total_exp / 2)
-            a = total_exp - h
-        # 保证不重复
         if other_score not in [s for s,_,_ in top]:
-            # 放入首位
             top = [(other_score, 0, result_type)] + top
-    # 返回比分字符串列表
     return [s for s,_,_ in top]
 
 # ============================================================
@@ -361,7 +333,6 @@ SHI_GAN = {"甲己":"甲", "乙庚":"丙", "丙辛":"戊", "丁壬":"庚", "戊�
 
 def get_ganzhi_from_date(dt):
     year, month, day, hour = dt.year, dt.month, dt.day, dt.hour
-    # 年柱（立春为界，近似）
     if month < 2 or (month == 2 and day < 4):
         gan_year = (year - 4) % 10
         zhi_year = (year - 4) % 12
@@ -369,7 +340,6 @@ def get_ganzhi_from_date(dt):
         gan_year = (year - 3) % 10
         zhi_year = (year - 3) % 12
     year_ganzhi = f"{TIAN_GAN[gan_year]}{DI_ZHI[zhi_year]}"
-    # 月柱
     month_zhi_map = {1:"寅",2:"卯",3:"辰",4:"巳",5:"午",6:"未",7:"申",8:"酉",9:"戌",10:"亥",11:"子",12:"丑"}
     month_zhi = month_zhi_map[month]
     for key, gan in YUE_GAN.items():
@@ -382,13 +352,11 @@ def get_ganzhi_from_date(dt):
     zhi_idx = DI_ZHI.index(month_zhi)
     month_gan = TIAN_GAN[(gan_idx + (zhi_idx - 2) % 12) % 10]
     month_ganzhi = f"{month_gan}{month_zhi}"
-    # 日柱
     base_date = datetime.date(1900, 1, 1)
     base_jiazi = "甲戌"
     delta = (dt.date() - base_date).days
     idx = (JIA_ZI.index(base_jiazi) + delta) % 60
     day_ganzhi = JIA_ZI[idx]
-    # 时柱
     for key, gan in SHI_GAN.items():
         if day_ganzhi[0] in key:
             shi_gan_start = gan
@@ -422,7 +390,6 @@ def get_ganzhi_from_date(dt):
     zhi_idx = DI_ZHI.index(shi_zhi)
     shi_gan = TIAN_GAN[(TIAN_GAN.index(shi_gan_start) + zhi_idx) % 10]
     shi_ganzhi = f"{shi_gan}{shi_zhi}"
-    # 旬空
     idx_day = JIA_ZI.index(day_ganzhi)
     start = (idx_day // 10) * 10
     kong1 = JIA_ZI[(start + 10) % 60]
@@ -535,21 +502,20 @@ def analyze_yao(yao_info, pos, shi, ying, dong, month_ganzhi, day_ganzhi, liu_sh
     an_dong = False
     if ri_chong and pos != dong and wang in ["旺","相"]:
         an_dong = True
-    
     wei_desc = {
-        1: "初爻（根基）代表开端、基础、群众",
-        2: "二爻（内卦）代表内部、家人、中层",
-        3: "三爻（多凶）代表变动、风险、边界",
-        4: "四爻（近君）代表副手、高层、近臣",
-        5: "五爻（尊位）代表主事、核心、领导",
-        6: "上爻（终局）代表结局、远方、退休"
+        1:"初爻（根基）代表开端、基础、群众",
+        2:"二爻（内卦）代表内部、家人、中层",
+        3:"三爻（多凶）代表变动、风险、边界",
+        4:"四爻（近君）代表副手、高层、近臣",
+        5:"五爻（尊位）代表主事、核心、领导",
+        6:"上爻（终局）代表结局、远方、退休"
     }
     qin_map = {
-        "官鬼": "对手、裁判、压力",
-        "妻财": "进球、收益",
-        "子孙": "技术、进攻、年轻球员",
-        "父母": "战术、教练、俱乐部",
-        "兄弟": "竞争、拼抢、消耗"
+        "官鬼":"对手、裁判、压力",
+        "妻财":"进球、收益",
+        "子孙":"技术、进攻、年轻球员",
+        "父母":"战术、教练、俱乐部",
+        "兄弟":"竞争、拼抢、消耗"
     }
     marks = []
     if pos == shi: marks.append("世爻")
@@ -561,7 +527,6 @@ def analyze_yao(yao_info, pos, shi, ying, dong, month_ganzhi, day_ganzhi, liu_sh
     if ri_he: marks.append("日合")
     if an_dong: marks.append("暗动")
     mark_str = ", ".join(marks) if marks else "无特殊"
-    
     foot_comment = ""
     if qin == "官鬼":
         if wang in ["旺","相"]: foot_comment = "对方攻势强，裁判尺度严"
@@ -860,7 +825,7 @@ def display_result(result, date_time, home, away):
 def main():
     st.markdown("""
     **输入方式：**  
-    ① **单场预测**：直接填写主队、客队、比赛时间，点击预测。  
+    ① **单场预测**：直接填写主队、客队，并选择日期和时间，点击预测。  
     ② **批量预测**：点击下方“批量输入”展开，粘贴多场比赛列表（每行格式：`时间，主队 vs 客队`）。
     """)
     
@@ -870,18 +835,21 @@ def main():
             home = st.text_input("🏠 主队", value="巴西")
             away = st.text_input("✈️ 客队", value="挪威")
         with col2:
-            date_time = st.text_input("📅 比赛时间", value="2026-07-06 03:00", help="格式：YYYY-MM-DD HH:MM 或 月-日 时:分")
+            match_date = st.date_input("📅 比赛日期", value=datetime.date.today())
+            match_time = st.time_input("🕐 比赛时间", value=datetime.time(15, 0))
         submitted = st.form_submit_button("🚀 预测并显示解卦过程")
         if submitted:
-            if not home or not away or not date_time:
-                st.warning("请完整填写主队、客队和比赛时间")
+            if not home or not away:
+                st.warning("请完整填写主队和客队")
             else:
-                result = predict_match(date_time, home, away)
-                display_result(result, date_time, home, away)
+                dt = datetime.datetime.combine(match_date, match_time)
+                date_time_str = dt.strftime("%Y-%m-%d %H:%M")
+                result = predict_match(date_time_str, home, away)
+                display_result(result, date_time_str, home, away)
     
     with st.expander("📋 批量输入（粘贴多场比赛）"):
         st.markdown("每行格式：`时间，主队 vs 客队`，例如：")
-        st.code("2026-07-06 03:00，巴西 vs 挪威")
+        st.code("2026-07-06 15:00，巴西 vs 挪威")
         user_input = st.text_area("粘贴比赛列表", height=200)
         if st.button("批量预测"):
             if not user_input.strip():
