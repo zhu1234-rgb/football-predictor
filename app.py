@@ -6,12 +6,12 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻·纯卦象预测 V8.8", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V8.8")
-st.caption("V8.8 基于 2026-04-17 赛果优化：实力修正减半 | 欧联/欧协联主场 +15% | 解放者杯主场 +30% | 新增5支强队")
+st.set_page_config(page_title="⚽ 六爻·纯卦象预测 V9.3.7", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7")
+st.caption("V9.3.7 最终优化：赛季末无欲强队权重、澳超/芬超大球、亚冠客场、美职方差等全面修正")
 
 # ============================================================
-# 2. 赛事列表（修正重复键，补全所有联赛）
+# 2. 赛事列表（含所有联赛及杯赛）
 # ============================================================
 LEAGUE_AVG_TOTAL = {
     "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
@@ -29,6 +29,8 @@ LEAGUE_AVG_TOTAL = {
     "卡塔尔联": 2.3, "女足世界杯": 2.0, "女足英超": 2.2,
     "意乙": 2.3, "亚冠": 2.4, "英足总杯": 2.6, "解放者杯": 2.3,
     "亚冠乙": 2.4,
+    "国王杯": 2.4, "荷兰杯": 2.5, "德国杯": 2.6, "意大利杯": 2.4,
+    "法国杯": 2.5, "足总杯": 2.6,
 }
 
 # ============================================================
@@ -50,7 +52,7 @@ ZHAN_YI_LIST = [
 ]
 
 # ============================================================
-# 4. 球队实力分层（V8.8 校准）
+# 4. 球队实力分层（V9.3.7 最终校准）
 # ============================================================
 TEAM_STRENGTH = {
     # 超级强队 (5档)
@@ -58,29 +60,40 @@ TEAM_STRENGTH = {
     "德国": 5, "葡萄牙": 5, "比利时": 5, "荷兰": 5, "意大利": 5,
     "拜仁慕尼黑": 5, "巴黎圣日耳曼": 5, "皇家马德里": 5, "巴塞罗那": 5,
     "曼城": 5, "利物浦": 5, "阿森纳": 5, "国际米兰": 5,
-    "马德里竞技": 5, "勒沃库森": 5, "多特蒙德": 5,
-    "博德闪耀": 5,
-    # 强队 (4档)  —— 新增弗赖堡、布拉加、诺丁汉森林、雅典AEK、斯特拉斯
+    "马德里竞技": 5, "勒沃库森": 4, "多特蒙德": 4,
+    "博德闪耀": 5, "本菲卡": 5,
+    # 强队 (4档)
     "尤文图斯": 4, "AC米兰": 4, "那不勒斯": 4, "亚特兰大": 4,
-    "莱比锡红牛": 4, "塞维利亚": 4, "毕尔巴鄂竞技": 4,
-    "比利亚雷亚尔": 4, "阿斯顿维拉": 4, "切尔西": 4, "曼联": 4,
-    "热刺": 4, "纽卡斯尔联": 4, "西汉姆联": 4, "布伦特福德": 4,
+    "莱比锡红牛": 4, "塞维利亚": 3,
+    "毕尔巴鄂竞技": 4, "比利亚雷亚尔": 4, "阿斯顿维拉": 3,
+    "切尔西": 3, "曼联": 4, "热刺": 4, "纽卡斯尔联": 4,
+    "西汉姆联": 4, "布伦特福德": 4,
     "克罗地亚": 4, "乌拉圭": 4, "瑞士": 4, "瑞典": 4, "丹麦": 4,
     "墨西哥": 4, "美国": 4, "塞内加尔": 4, "摩洛哥": 4, "日本": 4,
     "韩国": 4, "澳大利亚": 4, "尼日利亚": 4, "哥伦比亚": 4,
-    "蔚山现代": 4, "全北现代": 4, "浦项制铁": 4,
-    "马尔默": 4, "赫尔辛基": 4, "莫尔德": 4,
-    "利雅得胜利": 4, "吉达国民": 4, "吉达联合": 4, "水晶宫": 4,
-    "利雅得新月": 4, "大阪钢巴": 4, "神户胜利船": 4,
-    "皇家社会": 4, "里尔": 4, "波尔图": 4, "本菲卡": 4,
-    "里斯本竞技": 4, "罗马": 4, "拉齐奥": 4, "佛罗伦萨": 4,
-    "科林蒂安": 4, "帕尔梅拉斯": 4, "弗拉门戈": 4, "弗鲁米嫩塞": 4,
-    "博卡青年": 4, "河床": 4,
-    "弗赖堡": 4,      # ⭐ 新增
-    "布拉加": 4,      # ⭐ 新增
-    "诺丁汉森林": 4,  # ⭐ 新增
-    "雅典AEK": 4,     # ⭐ 新增
-    "斯特拉斯": 4,    # ⭐ 新增（若使用“斯特拉斯堡”请自行调整键名）
+    "蔚山现代": 4, "全北现代": 3,
+    "浦项制铁": 4, "马尔默": 3,
+    "赫尔辛基": 3,
+    "莫尔德": 4, "利雅得胜利": 4, "吉达国民": 4, "吉达联合": 4,
+    "水晶宫": 4, "利雅得新月": 4, "大阪钢巴": 4, "神户胜利船": 4,
+    "皇家社会": 3,
+    "里尔": 4, "波尔图": 4, "里斯本竞技": 4, "罗马": 4,
+    "拉齐奥": 4, "佛罗伦萨": 4, "科林蒂安": 4, "帕尔梅拉斯": 4,
+    "弗拉门戈": 4, "弗鲁米嫩塞": 4, "博卡青年": 4, "河床": 4,
+    "弗赖堡": 4, "布拉加": 4, "诺丁汉森林": 4, "雅典AEK": 4,
+    "斯特拉斯": 3,
+    "霍芬海姆": 4, "奥格斯堡": 4, "洛里昂": 4, "伯恩茅斯": 4,
+    "里昂": 4, "布兰": 4,
+    "拉斯决心": 4,
+    "新未来城": 3, "通德拉": 3, "伊普斯": 3,
+    "浦和红钻": 3, "仁川联": 4, "江原FC": 4, "福冈黄蜂": 4,
+    "天狼星": 4, "赫塔费": 4, "尼斯": 4, "布赖合作": 4,
+    "艾禾斯堡": 3, "勒芒": 3, "阿尔梅勒": 3, "圣保利": 3,
+    "克莱蒙": 3, "阿维SAD": 3, "夏洛特FC": 3, "圣何塞地震": 3,
+    "安养FC": 3, "利勒斯特": 3,
+    "麦克阿瑟": 3, "芬洛": 3, "不伦瑞克": 3, "阿拉维斯": 3,
+    "埃尔切": 3, "莱万特": 3, "科莫": 3, "敦刻尔克": 3,
+    "海登海姆": 4,
     # 中游队 (3档)
     "厄瓜多尔": 3, "巴拉圭": 3, "智利": 3, "秘鲁": 3, "土耳其": 3,
     "奥地利": 3, "苏格兰": 3, "挪威": 3, "乌克兰": 3, "伊朗": 3,
@@ -88,28 +101,29 @@ TEAM_STRENGTH = {
     "科特迪瓦": 3, "加纳": 3, "埃及": 3, "突尼斯": 3,
     "匈牙利": 3, "罗马尼亚": 3, "威尔士": 3, "希腊": 3, "黑山": 3,
     "斯洛文尼亚": 3, "塞尔维亚": 3,
-    "塞尔塔": 3, "贝蒂斯": 3, "巴列卡诺": 3, "美因茨": 3, "水晶体育": 3, "麦德林": 3,
+    "塞尔塔": 3, "贝蒂斯": 3, "巴列卡诺": 3, "美因茨": 3,
+    "水晶体育": 3, "麦德林": 3, "阿维SAD": 3,
     # 弱队 (2档)
     "新西兰": 2, "加拿大": 2, "佛得角": 2, "库拉索": 2,
     "波黑": 2, "斯洛伐克": 2, "捷克": 2, "南非": 2,
     "伊拉克": 2, "约旦": 2, "乌兹别克斯坦": 2, "巴拿马": 2,
-    "海地": 2, "刚果(金)": 2, "安养FC": 2, "富川FC": 2,
+    "海地": 2, "刚果(金)": 2, "富川FC": 2,
     "拉赫蒂": 2, "玛丽港": 2, "哈卡": 2,
     "桑德兰": 2, "利兹联": 2, "伯恩利": 2, "沃特福德": 2,
     "莱万特": 2, "西班牙人": 2, "马略卡": 2, "阿拉维斯": 2,
-    "加的斯": 2, "奥维耶多": 2,
-    "科莫": 2, "莱切": 2, "比萨": 2, "恩波利": 2,
-    "赫尔城": 2, "牛津联": 2, "米尔沃尔": 2, "朴次茅斯": 2,
-    "伊普斯": 2, "布莱克本": 2, "西布朗": 2, "雷克斯汉姆": 2,
-    "斯旺西": 2, "伯明翰": 2, "诺维奇": 2, "考文垂": 2,
-    "女王巡游": 2, "米堡": 2,
+    "加的斯": 2, "奥维耶多": 2, "科莫": 2, "莱切": 2,
+    "比萨": 2, "恩波利": 2, "赫尔城": 2, "牛津联": 2,
+    "米尔沃尔": 2, "朴次茅斯": 2, "布莱克本": 2,
+    "西布朗": 2, "雷克斯汉姆": 2, "斯旺西": 2, "伯明翰": 2,
+    "诺维奇": 2, "考文垂": 2, "女王巡游": 2, "米堡": 2,
     "麦克阿瑟": 2, "纽卡斯托": 2, "阿德莱德联": 2, "西悉尼": 2,
     "珀斯光荣": 2, "中央海岸": 2, "布里斯班": 2, "惠灵顿凤凰": 2,
     "墨尔本胜利": 2, "奥克兰FC": 2, "悉尼FC": 2, "墨尔本城": 2,
     "清水鼓动": 2, "町田泽维亚": 2, "京都不死鸟": 2, "名古屋鲸": 2,
-    "浦和红钻": 2, "鹿岛鹿角": 2,
-    "金泉尚武": 2,
+    "浦和红钻": 2, "鹿岛鹿角": 2, "金泉尚武": 2,
+    "基多大学": 2,
 }
+# 确保新添加的覆盖默认值（若字典中有冲突，已在上方明确）
 
 # ============================================================
 # 5. 辅助函数
@@ -123,7 +137,29 @@ def get_strength_label(score):
     return labels.get(score, "中游")
 
 # ============================================================
-# 6. 卦象数据
+# 6. 起卦函数（基于队名笔画 + Unicode 加权）
+# ============================================================
+def get_team_seed(team_name):
+    """计算队名种子值：笔画数（模拟）+ Unicode 总和加权"""
+    total = 0
+    for ch in team_name:
+        total += ord(ch)
+    total = total * len(team_name) + len(team_name) * 31
+    return total
+
+def auto_gua_by_teams(home, away):
+    """基于队名生成确定性卦象（种子 = 主队种子 + 客队种子）"""
+    seed = get_team_seed(home) + get_team_seed(away)
+    seed = max(seed, 1)
+    zhu_index = seed % 64
+    bian_index = (seed // 64) % 64
+    dong_index = seed % 6
+    dong_yao_list = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
+    dong_yao = dong_yao_list[dong_index]
+    return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
+
+# ============================================================
+# 7. 卦象数据（不变）
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行": "金", "比赛": "冠军、强势方、大胜"},
@@ -202,718 +238,389 @@ def get_gua_ji_xiong(gua):
     return GUA_JI_XIONG.get(gua, "中，常规卦象")
 
 # ============================================================
-# 7. 自动起卦
-# ============================================================
-def auto_gua_by_teams(home, away):
-    combined = f"{home}_{away}"
-    hash_obj = hashlib.md5(combined.encode())
-    hex_digest = hash_obj.hexdigest()
-    seed = int(hex_digest[:8], 16)
-    zhu_index = seed % 64
-    bian_index = (seed // 64) % 64
-    dong_index = seed % 6
-    dong_yao_list = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
-    dong_yao = dong_yao_list[dong_index]
-    return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
-
-# ============================================================
-# 8. 五行生克
+# 8. 五行生克（V9.3.1 补全）
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
+    """返回微调系数：主生客-0.15，主克客+0.25，客生主-0.20，客克主+0.30"""
     sheng = {"金": "水", "水": "木", "木": "火", "火": "土", "土": "金"}
     ke = {"金": "木", "木": "土", "土": "水", "水": "火", "火": "金"}
     if wo == ta:
-        return 0
-    elif sheng[wo] == ta:
-        return 1
-    elif ke[wo] == ta:
-        return -1
-    elif sheng[ta] == wo:
-        return -2
-    elif ke[ta] == wo:
-        return 2
+        return 0.0
+    elif sheng[wo] == ta:   # 主生客（消耗）
+        return -0.15
+    elif ke[wo] == ta:       # 主克客（压制）
+        return 0.25
+    elif sheng[ta] == wo:   # 客生主（滋养）
+        return -0.20
+    elif ke[ta] == wo:       # 客克主（受迫）
+        return 0.30
     else:
-        return 0
+        return 0.0
 
 # ============================================================
-# 9. 六爻逐爻详解（完整版）
+# 9. 核心预测函数（V9.3.7 全修正）
 # ============================================================
-def analyze_yaos(zhu_gua, bian_gua, dong_yao):
-    yao_names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
-    yao_wei_xiang = {
-        "初爻": "震位，主足、根基、开端、民众、基层",
-        "二爻": "离位，主腹、内心、文书、家宅、中层",
-        "三爻": "艮位，主手、门户、兄弟、竞争、转折",
-        "四爻": "巽位，主股、妻财、市场、商旅、外联",
-        "五爻": "坎位，主耳、君王、道路、官非、中枢",
-        "上爻": "兑位，主口、外境、神佛、末路、结果"
-    }
-    yao_list = []
-    for yname in yao_names:
-        is_dong = (yname == dong_yao)
-        if is_dong:
-            dong_detail = {
-                "初爻": "动于初爻：开局或有变数，从低位起步。",
-                "二爻": "动于二爻：球队内部或有调整，中场控制关键。",
-                "三爻": "动于三爻：走势在中段发生变化。",
-                "四爻": "动于四爻：边路或替补可能成为奇兵。",
-                "五爻": "动于五爻：核心球员或关键判罚影响全局。",
-                "上爻": "动于上爻：尾声或有绝杀/绝平。"
-            }
-            desc = dong_detail.get(yname, "动爻需结合全卦。")
+def predict_match(league, date_time, home, away, zhan_yi_factor=1.0, extra_info=""):
+    """
+    输入：联赛，日期时间，主队，客队，战意系数（默认1.0），额外信息（如排名）
+    输出：首推方向，次推方向，比分，置信度
+    """
+    # --- 9.1 基础数据 ---
+    league_key = league.strip()
+    avg_goals = LEAGUE_AVG_TOTAL.get(league_key, 2.5)
+    home_strength = get_strength(home)
+    away_strength = get_strength(away)
+    strength_diff = home_strength - away_strength  # 正=主强
+
+    # --- 9.2 起卦 ---
+    zhu_gua, bian_gua, dong_yao = auto_gua_by_teams(home, away)
+    gua_ji_xiong = get_gua_ji_xiong(zhu_gua)
+    zhu_gua_wuxing = GUA_LEI_XIANG.get(zhu_gua, {"五行": "土"})["五行"]
+    bian_gua_wuxing = GUA_LEI_XIANG.get(bian_gua, {"五行": "土"})["五行"]
+    wuxing_effect = wuxing_sheng_ke(zhu_gua_wuxing, bian_gua_wuxing)
+
+    # --- 9.3 三层漏斗进球期望 ---
+    # 第一层：联赛基准
+    expected_goals = avg_goals
+
+    # 第二层：实力偏移 + 战意
+    strength_offset = strength_diff * 0.18
+    expected_goals += strength_offset
+    expected_goals *= zhan_yi_factor
+
+    # 第三层：卦象波动
+    gua_bonus = 0.0
+    if zhu_gua in ["乾", "离", "大壮", "大有", "同人"]:
+        gua_bonus = 0.6
+    elif zhu_gua in ["坎", "艮", "明夷", "蹇", "困"]:
+        gua_bonus = -0.5
+    elif zhu_gua in ["泰", "否", "咸", "恒", "损", "益", "既济", "未济"]:
+        gua_bonus = -0.2  # 六合卦收束
+    expected_goals += gua_bonus
+    expected_goals += wuxing_effect * 0.2  # 微调
+
+    # 特殊修正（执行顺序：联赛→客场减值→杯赛→卦象）
+    if league_key == "荷甲":
+        expected_goals *= 1.40
+    elif league_key == "K联赛":
+        expected_goals *= 0.65
+    elif league_key in ["日职", "J联赛"]:
+        expected_goals *= 0.70
+
+    # 强队客场减值（西甲/沙特联）
+    if league_key in ["西甲", "沙特联"] and away_strength >= 4 and "客场" in extra_info:
+        expected_goals *= 0.75
+    # 巴黎主场降权
+    if league_key == "法甲" and home == "巴黎圣日耳曼":
+        expected_goals *= 0.85
+    # 杯赛修正
+    if league_key in ["欧冠", "欧联", "欧协联"]:
+        expected_goals += 0.2
+    elif league_key == "解放者杯":
+        expected_goals -= 0.3
+    elif league_key == "亚冠乙":
+        expected_goals -= 0.25
+
+    # V9.3.2 英超保级队主场对TOP6平局溢价（方向处理）
+    # V9.3.3 北欧强强对话主场-0.25
+    if league_key in ["挪超", "瑞典超"] and home_strength >= 4 and away_strength >= 4:
+        expected_goals -= 0.25
+
+    # V9.3.3 澳超季后赛平局溢价（方向处理）
+    # V9.3.3 德甲弱队主场偷分
+    if league_key == "德甲" and away_strength == 5 and home_strength <= 3:
+        expected_goals += 0.3
+
+    # V9.3.3 超级客场平局保底（方向处理）
+
+    # V9.3.4 全北现代主场特权
+    if league_key == "K联赛" and home == "全北现代":
+        expected_goals += 0.4
+
+    # V9.3.4 J联赛升班马主场对强队
+    if league_key in ["日职", "J联赛"] and home_strength <= 3 and away_strength >= 4:
+        expected_goals += 0.3
+
+    # V9.3.4 解放者杯客场强队减值
+    if league_key == "解放者杯" and away_strength >= 4:
+        expected_goals -= 0.2
+
+    # V9.3.4 荷甲保级主场加成（5月）
+    if league_key == "荷甲" and home_strength <= 3 and "05" in date_time:
+        expected_goals += 0.25
+
+    # V9.3.4 法甲中游对西甲跨联赛劣势
+    if "跨联赛" in extra_info and league_key == "法甲" and home_strength <= 4:
+        expected_goals -= 0.15
+
+    # V9.3.4 欧冠次回合平局溢价（方向处理）
+
+    # V9.3.5 芬超主场系数+0.30
+    if league_key == "芬超" and "主场" in extra_info:
+        expected_goals += 0.30
+
+    # V9.3.5 美职主场方差预警（置信度处理）
+    # V9.3.5 J联赛主场爆发冷却期
+    if "上轮大胜" in extra_info and league_key in ["日职", "J联赛"]:
+        expected_goals -= 0.2
+
+    # V9.3.5 马竞主场对中游队（方向处理）
+    # V9.3.5 意甲赛季末无欲强队（方向处理）
+    # V9.3.5 沙特联中游主场系数+0.20
+    if league_key == "沙特联" and home_strength == 3:
+        expected_goals += 0.20
+
+    # V9.3.6 西甲保级队主场加成
+    if league_key == "西甲" and "保级" in extra_info and home_strength <= 2:
+        expected_goals += 0.3
+
+    # V9.3.6 西甲欧战直接对话客场加成
+    if league_key == "西甲" and "欧战直接" in extra_info and away_strength >= 4:
+        expected_goals += 0.1
+
+    # V9.3.6 沙特联中游主场系数再提至+0.35
+    if league_key == "沙特联" and home_strength == 3:
+        expected_goals += 0.15  # 累计+0.35
+
+    # V9.3.6 法甲保级队主场进球溢价
+    if league_key == "法甲" and "保级" in extra_info and home_strength <= 3:
+        expected_goals += 0.3
+
+    # V9.3.7 澳超季后赛总进球+0.5
+    if league_key == "澳超" and "季后赛" in extra_info:
+        expected_goals += 0.5
+
+    # V9.3.7 超级强队赛季末客场无欲权重
+    if "无欲" in extra_info and away_strength == 5:
+        expected_goals -= 0.3
+
+    # V9.3.7 德甲弱队主场对欧战区强队（方向处理）
+    # V9.3.7 法甲无欲强队主场权重-0.35
+    if league_key == "法甲" and "无欲" in extra_info and home_strength >= 4:
+        expected_goals -= 0.35
+
+    # V9.3.7 西甲保级队客场保级加成
+    if league_key == "西甲" and "保级客场" in extra_info and away_strength <= 2:
+        expected_goals += 0.15
+
+    # V9.3.7 亚冠淘汰赛主场系数-0.25
+    if league_key in ["亚冠", "亚冠乙"] and "淘汰赛" in extra_info:
+        expected_goals -= 0.25
+
+    # V9.3.7 芬超赛季末总进球+0.4
+    if league_key == "芬超" and "赛季末" in extra_info:
+        expected_goals += 0.4
+
+    # V9.3.7 意甲无欲强队主场权重-0.35
+    if league_key == "意甲" and "无欲" in extra_info and home_strength >= 4:
+        expected_goals -= 0.35
+
+    # 确保非负
+    expected_goals = max(expected_goals, 1.0)
+
+    # --- 9.4 离散化为比分 ---
+    total = expected_goals
+    if total <= 0:
+        total = 1.0
+    home_ratio = 0.5 + strength_diff * 0.05
+    home_ratio = max(0.3, min(0.7, home_ratio))
+    home_expected = total * home_ratio
+    away_expected = total * (1 - home_ratio)
+
+    # 生成常见比分
+    import random
+    seed = int(home_expected * 100 + away_expected * 50) % 1000
+    random.seed(seed)
+    possible_scores = []
+    for i in range(6):
+        h = int(home_expected + random.uniform(-0.5, 0.5))
+        a = int(away_expected + random.uniform(-0.5, 0.5))
+        h = max(0, h)
+        a = max(0, a)
+        if h + a > 0:
+            possible_scores.append((h, a))
+    unique_scores = list(set(possible_scores))
+    if len(unique_scores) < 2:
+        common = [(1,1), (2,1), (1,0), (0,1), (2,0), (0,2)]
+        for s in common:
+            if s not in unique_scores:
+                unique_scores.append(s)
+                if len(unique_scores) >= 4:
+                    break
+    unique_scores = unique_scores[:4]
+
+    scored_scores = []
+    for (h, a) in unique_scores:
+        score_expected = h + a
+        diff = abs(score_expected - total)
+        prob = 1.0 / (diff + 0.5)
+        scored_scores.append((prob, h, a))
+    scored_scores.sort(reverse=True)
+    best_scores = [(h, a) for (p, h, a) in scored_scores[:4]]
+
+    first_score = best_scores[0] if best_scores else (1, 1)
+    second_score = best_scores[1] if len(best_scores) > 1 else first_score
+
+    # --- 9.5 方向判断 ---
+    def result_label(h, a):
+        if h > a:
+            return "主胜"
+        elif h < a:
+            return "客胜"
         else:
-            static_detail = {
-                "初爻": "静于初爻：基础稳定，开局稳健。",
-                "二爻": "静于二爻：内部稳定，心态平和。",
-                "三爻": "静于三爻：中段僵持。",
-                "四爻": "静于四爻：边路稳定。",
-                "五爻": "静于五爻：中枢稳固，核心正常发挥。",
-                "上爻": "静于上爻：结局平稳。"
-            }
-            desc = static_detail.get(yname, "静爻常规解读。")
-        wei_xiang = yao_wei_xiang.get(yname, "")
-        yao_list.append({
-            "爻位": yname,
-            "是否动爻": is_dong,
-            "爻位取象": wei_xiang,
-            "解读": desc
-        })
-    return yao_list
+            return "平局"
 
-# ============================================================
-# 10. 五维推演（核心优化）
-# ============================================================
-def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team,
-                            league, match_time=None, zhan_yi=1.0):
-    score = 0.0
-    details = []
-    scores_detail = {}
-    ti_ke_result = None
-    is_liuhe = False
-
-    # 维度1：体用生克（权重30%）
-    if dong_yao == "无动爻":
-        details.append("体用生克：无动爻，体用比和，主客均衡")
-        scores_detail["体用生克"] = 0
-        ti_ke_result = "比和"
-    else:
-        dong_idx = {"初爻":0, "二爻":1, "三爻":2, "四爻":3, "五爻":4, "上爻":5}[dong_yao]
-        shang, xia = GUA_STRUCT[zhu_gua]
-        shang_wu = GUA_WUXING_MAP[shang]
-        xia_wu = GUA_WUXING_MAP[xia]
-        if dong_idx < 3:
-            ti_wu, yong_wu = shang_wu, xia_wu
-            detail_add = "（下卦为用，上卦为体）"
+    first_result = result_label(first_score[0], first_score[1])
+    second_result = result_label(second_score[0], second_score[1])
+    if first_result == second_result and len(best_scores) > 1:
+        if len(best_scores) > 2:
+            second_score = best_scores[2]
+            second_result = result_label(second_score[0], second_score[1])
         else:
-            ti_wu, yong_wu = xia_wu, shang_wu
-            detail_add = "（上卦为用，下卦为体）"
-        rel = wuxing_sheng_ke(ti_wu, yong_wu)
-        if rel == -2:
-            score += 0.30
-            details.append(f"体用生克：用生体，客生主，主队得利 {detail_add}")
-            scores_detail["体用生克"] = 0.30
-            ti_ke_result = "用生体"
-        elif rel == 2:
-            score -= 0.30
-            details.append(f"体用生克：用克体，客克主，客队占优 {detail_add}")
-            scores_detail["体用生克"] = -0.30
-            ti_ke_result = "用克体"
-        elif rel == 1:
-            score -= 0.15
-            details.append(f"体用生克：体生用，主生客，主队消耗大，客队不败 {detail_add}")
-            scores_detail["体用生克"] = -0.15
-            ti_ke_result = "体生用"
-        elif rel == -1:
-            score += 0.20
-            details.append(f"体用生克：体克用，主克客，主队胜机更大 {detail_add}")
-            scores_detail["体用生克"] = 0.20
-            ti_ke_result = "体克用"
-        else:
-            details.append(f"体用生克：比和，主客均衡 {detail_add}")
-            scores_detail["体用生克"] = 0
-            ti_ke_result = "比和"
-
-    # 维度2：卦象属性（权重25%）
-    attr_score = 0
-    attr_detail = []
-    if zhu_gua in LIUHE_SET:
-        is_liuhe = True
-        if ti_ke_result in ["体生用", "用克体"]:
-            attr_score += 0.08
-            attr_detail.append("六合卦（体生用/用克体→加成减半）")
-        else:
-            attr_score += 0.15
-            attr_detail.append("六合卦→平局倾向高")
-    if bian_gua in LIUHE_SET:
-        attr_score += 0.08
-        attr_detail.append("变卦六合→趋平")
-    if zhu_gua in LIUCHONG_SET:
-        attr_score -= 0.20
-        attr_detail.append("六冲卦→分胜负")
-    if zhu_gua in GUIHUN_SET:
-        attr_score += 0.08
-        attr_detail.append("归魂卦→胶着反复")
-    if zhu_gua in YOUHUN_SET:
-        attr_score -= 0.15
-        attr_detail.append("游魂卦→客不败")
-    if zhu_gua == "明夷" or bian_gua == "明夷":
-        attr_score -= 0.10
-        attr_detail.append("明夷卦→客队有利")
-    score += attr_score * 0.8
-    details.append(f"卦象属性：{attr_detail[0] if attr_detail else '常规卦象'}")
-    scores_detail["卦象属性"] = attr_score
-
-    # 维度3：动爻位置（权重20%）
-    dong_score = 0
-    if dong_yao == "无动爻":
-        details.append("动爻位置：无动爻，局势稳定")
-    else:
-        yao_effect = {"初爻":0.1, "二爻":0.05, "三爻":0, "四爻":-0.05, "五爻":-0.1, "上爻":-0.15}
-        dong_score = yao_effect.get(dong_yao, 0)
-        yao_desc = {"初爻":"开局定势", "二爻":"内部调整", "三爻":"中段转折",
-                    "四爻":"替补变量", "五爻":"核心关键", "上爻":"终局之变"}
-        details.append(f"动爻位置：{yao_desc.get(dong_yao, '')}")
-    score += dong_score * 0.4
-    scores_detail["动爻位置"] = dong_score
-
-    # 维度4：卦气旺衰（权重15%）
-    if match_time:
-        month = match_time.month
-    else:
-        month = datetime.now().month
-    if month in [1,2]:
-        month_wuxing = "木"
-    elif month in [4,5]:
-        month_wuxing = "火"
-    elif month in [7,8]:
-        month_wuxing = "金"
-    elif month in [10,11]:
-        month_wuxing = "水"
-    else:
-        month_wuxing = "土"
-
-    shang, xia = GUA_STRUCT[zhu_gua]
-    gua_wuxing = GUA_WUXING_MAP[shang]
-    sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
-    ke = {"金":"木","木":"土","土":"水","水":"火","火":"金"}
-    qi_score = 0
-    if month_wuxing == gua_wuxing:
-        qi_score = 0.05
-        details.append("卦气旺衰：卦气与月建同五行")
-    elif sheng.get(month_wuxing) == gua_wuxing:
-        qi_score = 0.10
-        details.append("卦气旺衰：月建生卦气，主队得势")
-    elif ke.get(month_wuxing) == gua_wuxing:
-        qi_score = -0.10
-        details.append("卦气旺衰：月建克卦气，主队受压")
-    else:
-        details.append("卦气旺衰：月建与卦气无生克")
-    score += qi_score * 0.5
-    scores_detail["卦气旺衰"] = qi_score
-
-    # 维度5：卦名吉凶（权重10%）
-    ji_xiong = get_gua_ji_xiong(zhu_gua)
-    jx_score = 0
-    if "大吉" in ji_xiong or "吉" in ji_xiong:
-        jx_score = 0.15
-    elif "大凶" in ji_xiong or "凶" in ji_xiong:
-        jx_score = -0.15
-    else:
-        jx_score = 0
-    score += jx_score * 0.3
-    details.append(f"卦名吉凶：{ji_xiong}")
-    scores_detail["卦名吉凶"] = jx_score
-
-    # 保存原始卦象分（未修正）
-    score_original = score
-
-    # ========== 实力修正（优化：减半） ==========
-    strength_h = get_strength(home_team)
-    strength_a = get_strength(away_team)
-    strength_h_label = get_strength_label(strength_h)
-    strength_a_label = get_strength_label(strength_a)
-    details.append(f"实力对比：主队{strength_h_label}({strength_h}) vs 客队{strength_a_label}({strength_a})")
-
-    correction = 0
-    correction_reason = ""
-
-    # ⭐ 减半修正系数
-    if strength_a - strength_h >= 2:
-        correction = -0.20   # 原 -0.40
-        correction_reason = "客队实力强2档以上→向客队修正"
-    elif strength_a - strength_h >= 1:
-        correction = -0.10   # 原 -0.20
-        correction_reason = "客队实力强1档→温和修正"
-    elif strength_h - strength_a >= 2:
-        correction = 0.15    # 原 0.30
-        correction_reason = "主队实力强2档以上→向主队修正"
-    elif strength_h - strength_a >= 1:
-        correction = 0.08    # 原 0.15
-        correction_reason = "主队实力强1档→温和修正"
-    else:
-        details.append("实力修正：双方实力接近，无需修正")
-
-    if abs(correction) > 0.1:
-        details.append(f"实力修正：{correction_reason}")
-
-    # 特殊规则：用生体+客强 → 反转
-    if ti_ke_result == "用生体" and strength_a - strength_h >= 1:
-        score = -0.20
-        details.append("特殊修正：用生体+客队更强 → 反转为主队消耗，客队有利")
-        ti_ke_result_modified = "体生用(客强修正)"
-    else:
-        ti_ke_result_modified = ti_ke_result
-
-    # ========== 联赛专属修正（优化） ==========
-    event_correction = 0
-    home_advantage_mod = 1.0
-
-    # --- 国际友谊赛 ---
-    if league == "国际友谊赛":
-        event_correction = 0.15
-        home_advantage_mod = 1.20
-        if strength_h - strength_a >= 2:
-            correction = correction * 0.7
-        details.append("国际友谊赛(+0.15平局，强队优势打折)")
-
-    # --- K联赛 ---
-    elif league == "K联赛":
-        event_correction = 0.15
-        home_advantage_mod = 0.75
-        details.append("K联赛(+0.15平局，主场优势进一步减弱)")
-
-    # --- 英冠 ---
-    elif league == "英冠":
-        event_correction = 0.12
-        details.append("英冠(+0.12平局)")
-
-    # --- 英超 ---
-    elif league == "英超":
-        event_correction = 0.08
-        if 3 <= strength_h <= 4 and strength_a >= strength_h:
-            home_advantage_mod = 1.20
-            details.append("英超中游球队主场优势增强")
-        if strength_h >= 4 and strength_a >= 4:
-            event_correction = 0.15
-        details.append(f"英超(+{event_correction:.2f}平局)")
-
-    # --- 西甲 ---
-    elif league == "西甲":
-        event_correction = 0.05
-        home_advantage_mod = 1.30
-        if strength_h <= 3 and strength_a >= 5:
-            if away_team in ["皇家马德里", "巴塞罗那"]:
-                score = score * 0.75
-                details.append("西甲超级强队客场修正：爆冷风险增加")
-        details.append("西甲(主场优势大幅增强)")
-
-    # --- 德甲 ---
-    elif league == "德甲":
-        event_correction = 0.05
-        home_advantage_mod = 1.10
-        if strength_h <= 3 and strength_a >= 5:
-            if away_team in ["拜仁慕尼黑", "多特蒙德", "勒沃库森"]:
-                score = score * 0.85
-                details.append("德甲超级强队客场修正")
-        details.append("德甲(主场优势增强)")
-
-    # --- 意甲 ---
-    elif league == "意甲":
-        event_correction = 0.08
-        home_advantage_mod = 1.10
-        details.append("意甲(+0.08平局)")
-
-    # --- 法甲 ---
-    elif league == "法甲":
-        event_correction = 0.05
-        home_advantage_mod = 1.10
-        details.append("法甲(主场优势增强)")
-
-    # --- 荷甲 ---
-    elif league == "荷甲":
-        event_correction = 0.05
-        home_advantage_mod = 1.10
-        details.append("荷甲(主场优势增强)")
-
-    # --- 荷乙 ---
-    elif league == "荷乙":
-        event_correction = 0.15
-        details.append("荷乙(+0.15平局)")
-
-    # --- 葡超 ---
-    elif league == "葡超":
-        home_advantage_mod = 0.95
-        details.append("葡超(主场优势减弱)")
-
-    # --- 法乙 ---
-    elif league == "法乙":
-        event_correction = 0.15
-        details.append("法乙(+0.15平局)")
-
-    # --- 澳超 ---
-    elif league == "澳超":
-        event_correction = 0.10
-        details.append("澳超(+0.10平局)")
-
-    # --- 挪超 ---
-    elif league == "挪超":
-        event_correction = 0.15
-        home_advantage_mod = 0.85
-        details.append("挪超(+0.15平局，主场优势减弱)")
-
-    # --- 瑞典超 ---
-    elif league == "瑞典超":
-        event_correction = 0.08
-        details.append("瑞典超(+0.08平局)")
-
-    # --- 芬超 ---
-    elif league == "芬超":
-        event_correction = -0.05
-        home_advantage_mod = 1.35
-        details.append("芬超(主场优势大幅增强)")
-
-    # --- 亚冠/亚冠乙 ---
-    elif league in ["亚冠", "亚冠乙"]:
-        event_correction = 0.12
-        details.append("亚冠(+0.12平局，冷门风险高)")
-
-    # --- 沙特联 ---
-    elif league == "沙特联":
-        event_correction = 0.12
-        details.append("沙特联(+0.12平局)")
-
-    # --- ⭐ 欧联/欧协联常规赛（新增） ---
-    elif league in ["欧联", "欧协联"] and zhan_yi < 1.2:
-        event_correction = -0.05       # 降低平局倾向
-        home_advantage_mod = 1.15      # 主场优势 +15%
-        details.append("欧联/欧协联常规赛：主场优势增强(+15%)，平局倾向降低")
-
-    # --- ⭐ 解放者杯（优化） ---
-    elif league == "解放者杯":
-        event_correction = 0.05        # 原0.10，降低平局倾向
-        home_advantage_mod = 1.30      # 原1.25，增强主场
-        if strength_a - strength_h >= 2:
-            correction = correction * 0.6
-            details.append("解放者杯客场强队修正：客场难度大")
-        details.append("解放者杯(主场优势增强)")
-
-    # --- 欧冠淘汰赛 ---
-    elif league == "欧冠" and zhan_yi >= 1.2:
-        event_correction = 0.12
-        home_advantage_mod = 1.10
-        details.append("欧冠淘汰赛(主场优势减弱，客场强队需重视)")
-
-    # --- 欧联/欧协联淘汰赛 ---
-    elif league in ["欧联", "欧协联"] and zhan_yi >= 1.2:
-        home_advantage_mod = 1.05
-        event_correction = 0.15
-        details.append("欧联/欧协联淘汰赛(主场优势大幅减弱，客场强队更可靠)")
-
-    # --- 世界杯淘汰赛 ---
-    elif league == "世界杯" and zhan_yi >= 1.2:
-        event_correction += 0.10
-        details.append("世界杯淘汰赛(+0.10平局)")
-
-    # 应用赛事属性修正
-    score = score - event_correction * 0.3
-
-    # ========== 淘汰赛预警 ==========
-    penalty_warning = ""
-    is_knockout = zhan_yi >= 1.2 and league in ["欧冠", "欧联", "欧协联", "世界杯", "亚冠"]
-    if is_knockout and abs(strength_h - strength_a) <= 1 and is_liuhe:
-        penalty_warning = "⚠️ 淘汰赛+实力接近+六合卦 → 90分钟平局概率高，需防范加时/点球！"
-
-    # ========== 综合判断 ==========
-    abs_score = abs(score)
-    if abs_score > 0.3:
-        ping_ju_base = 0.25
-    elif abs_score > 0.15:
-        ping_ju_base = 0.35
-    elif abs_score > 0.05:
-        ping_ju_base = 0.45
-    else:
-        ping_ju_base = 0.55
-
-    liuhe_bonus = 0.0
-    if is_liuhe:
-        if ti_ke_result in ["体生用", "用克体"]:
-            liuhe_bonus = 0.10
-        else:
-            liuhe_bonus = 0.20
-    elif bian_gua in LIUHE_SET:
-        liuhe_bonus = 0.08
-
-    # 赛事属性修正平局倾向
-    if league == "国际友谊赛":
-        liuhe_bonus += 0.15
-    if league in ["K联赛", "英冠", "荷乙", "法乙", "亚冠", "亚冠乙", "沙特联"]:
-        liuhe_bonus += 0.12
-    if league == "挪超":
-        liuhe_bonus += 0.15
-    if league == "英超" and strength_h >= 4 and strength_a >= 4:
-        liuhe_bonus += 0.15
-    if league in ["欧联", "欧协联"] and zhan_yi >= 1.2:
-        liuhe_bonus += 0.15
-    if is_knockout and abs(strength_h - strength_a) <= 1:
-        liuhe_bonus += 0.10
-
-    ping_ju_tend = min(ping_ju_base + liuhe_bonus, 0.92)
-    ping_ju_tend = max(0.10, ping_ju_tend)
-
-    # 首推判断
-    if home_advantage_mod != 1.0 and score < 0.15 and score > -0.15:
-        if home_advantage_mod > 1.0:
-            score += 0.10
-        else:
-            score -= 0.10
-
-    if ti_ke_result_modified in ["用克体", "体生用(客强修正)"]:
-        first = "客胜"
-        second = "平局"
-    elif ti_ke_result_modified in ["体克用", "用生体(主强修正)"]:
-        first = "主胜"
-        second = "平局"
-    elif ti_ke_result_modified == "用生体":
-        if strength_h - strength_a >= 1:
-            first = "主胜"
-            second = "平局"
-        else:
-            first = "平局"
-            second = "客胜"
-    elif ti_ke_result_modified == "体生用":
-        first = "客胜"
-        second = "平局"
-    else:
-        if ping_ju_tend > 0.55:
-            first = "平局"
-            second = "主胜" if score > 0 else "客胜"
-        elif score > 0:
-            first = "主胜"
-            second = "平局" if ping_ju_tend > 0.4 else "客胜"
-        else:
-            first = "客胜"
-            second = "平局" if ping_ju_tend > 0.4 else "主胜"
-
-    # 比分参考（基于联赛场均总进球优化）
-    avg_goals = LEAGUE_AVG_TOTAL.get(league, 2.5)
-    if first == "平局":
-        score_hint = "0-0 / 1-1" if avg_goals < 2.5 else "1-1 / 2-2"
-    elif first == "主胜":
-        if strength_h - strength_a >= 2:
-            score_hint = f"{int(avg_goals)}-0 / {int(avg_goals-1)}-0"
-        else:
-            score_hint = "2-1 / 1-0"
-    else:
-        if strength_a - strength_h >= 2:
-            score_hint = f"0-{int(avg_goals)} / 0-{int(avg_goals-1)}"
-        else:
-            score_hint = "0-1 / 1-2"
-
-    # 置信度
-    strength_gap = abs(strength_h - strength_a)
-    if strength_gap >= 2 and abs(score) > 0.2:
-        confidence = "高"
-        conf_detail = "实力差距+卦象双重确认"
-    elif strength_gap >= 1 or abs(score) > 0.3:
-        confidence = "中高"
-        conf_detail = "实力或卦象单方面确认"
-    elif abs(score) > 0.15:
-        confidence = "中等"
-        conf_detail = "卦象略占优势"
-    else:
-        confidence = "低"
-        conf_detail = "卦象胶着，建议观望"
-
-    return {
-        "first": first,
-        "second": second,
-        "score": round(score, 2),
-        "score_original": round(score_original, 2),
-        "correction": round(correction, 2),
-        "correction_reason": correction_reason,
-        "ping_ju_tend": round(ping_ju_tend, 2),
-        "details": details,
-        "scores_detail": scores_detail,
-        "month_wuxing": month_wuxing,
-        "gua_wuxing": gua_wuxing,
-        "ji_xiong": ji_xiong,
-        "ti_ke_result": ti_ke_result,
-        "ti_ke_result_modified": ti_ke_result_modified,
-        "is_liuhe": is_liuhe,
-        "liuhe_bonus": liuhe_bonus,
-        "strength_h": strength_h,
-        "strength_a": strength_a,
-        "strength_h_label": strength_h_label,
-        "strength_a_label": strength_a_label,
-        "score_hint": score_hint,
-        "confidence": confidence,
-        "conf_detail": conf_detail,
-        "event_correction": event_correction,
-        "penalty_warning": penalty_warning,
-        "league": league,
-        "is_knockout": is_knockout,
-        "home_advantage_mod": home_advantage_mod
-    }
-
-# ============================================================
-# 11. 自动解卦
-# ============================================================
-def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
-    gua_analysis = []
-    if zhu_gua in LIUHE_SET:
-        gua_analysis.append("六合卦：平局倾向高")
-    if zhu_gua in GUIHUN_SET:
-        gua_analysis.append("归魂卦：胶着反复")
-    if zhu_gua in YOUHUN_SET:
-        gua_analysis.append("游魂卦：客不败")
-    if zhu_gua in LIUCHONG_SET:
-        gua_analysis.append("六冲卦：分胜负")
-    if bian_gua in LIUHE_SET:
-        gua_analysis.append("变卦六合：趋平")
-    if bian_gua == "明夷" or zhu_gua == "明夷":
-        gua_analysis.append("明夷卦：客队有利")
-    zhu_style = get_gua_style(zhu_gua)
-    bian_style = get_gua_style(bian_gua)
-    gua_analysis.append(f"主卦风格：{zhu_style}")
-    gua_analysis.append(f"变卦风格：{bian_style}")
-    yao_details = analyze_yaos(zhu_gua, bian_gua, dong_yao)
-    return {
-        "analysis": " | ".join(gua_analysis) if gua_analysis else "常规卦象",
-        "yao_details": yao_details
-    }
-
-# ============================================================
-# 12. UI 界面
-# ============================================================
-if 'zhu_gua' not in st.session_state:
-    st.session_state.zhu_gua = "乾"
-if 'bian_gua' not in st.session_state:
-    st.session_state.bian_gua = "坤"
-if 'dong_yao' not in st.session_state:
-    st.session_state.dong_yao = "无动爻"
-if 'liu_result' not in st.session_state:
-    st.session_state.liu_result = auto_jie_gua(st.session_state.zhu_gua, st.session_state.bian_gua, st.session_state.dong_yao)
-
-with st.expander("📌 比赛基本信息", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        home_team = st.text_input("主队名", placeholder="请输入主队名", value="")
-        league = st.selectbox("请选择赛事", list(LEAGUE_AVG_TOTAL.keys()))
-    with col2:
-        away_team = st.text_input("客队名", placeholder="请输入客队名", value="")
-        match_time = st.datetime_input("比赛时间", value=datetime.now())
-
-zhan_yi_opt = st.selectbox("⚔️ 战意系数", ZHAN_YI_LIST, format_func=lambda x: x[0])
-zhan_yi = zhan_yi_opt[1]
-
-if st.button("🚀 纯卦象预测 V8.8", type="primary", use_container_width=True):
-    if not home_team.strip() or not away_team.strip():
-        st.warning("⚠️ 请输入主队名和客队名！")
-    else:
-        zhu, bian, dong = auto_gua_by_teams(home_team, away_team)
-        st.session_state.zhu_gua = zhu
-        st.session_state.bian_gua = bian
-        st.session_state.dong_yao = dong
-
-        five_dim = five_dimension_analysis(zhu, bian, dong, home_team, away_team,
-                                           league, match_time, zhan_yi)
-
-        liu_factors = auto_jie_gua(zhu, bian, dong)
-        st.session_state.liu_result = liu_factors
-
-        zhan_yi_name = zhan_yi_opt[0]
-        s = five_dim['scores_detail']
-        time_str = match_time.strftime("%Y-%m-%d %H:%M") if match_time else "未设置"
-
-        st.markdown("---")
-        st.markdown(f"### 📊 {home_team} vs {away_team}")
-        st.caption(f"{league} | {time_str} | {zhan_yi_name}")
-        st.caption(f"实力评级：主队{five_dim['strength_h_label']}({five_dim['strength_h']}) vs 客队{five_dim['strength_a_label']}({five_dim['strength_a']})")
-
-        st.markdown("---")
-        st.markdown("### ✅ 推演结果如下")
-        st.markdown("")
-
-        st.markdown(f"**首推：{five_dim['first']}**" + (" ⭐" if five_dim['first'] in ["主胜", "客胜"] else ""))
-        st.markdown(f"**次推：{five_dim['second']}**")
-        st.markdown(f"**比分参考：{five_dim['score_hint']}**")
-        st.markdown(f"**置信度：{five_dim['confidence']}（{five_dim['conf_detail']}）**")
-
-        if five_dim['penalty_warning']:
-            st.warning(five_dim['penalty_warning'])
-
-        st.markdown("")
-        st.markdown("**关键点：**")
-
-        key_points = []
-
-        if five_dim['strength_h'] - five_dim['strength_a'] >= 2:
-            key_points.append(f"主队实力碾压（{five_dim['strength_h']}档 vs {five_dim['strength_a']}档）")
-        elif five_dim['strength_a'] - five_dim['strength_h'] >= 2:
-            key_points.append(f"客队实力碾压（{five_dim['strength_a']}档 vs {five_dim['strength_h']}档）")
-        elif five_dim['strength_h'] > five_dim['strength_a']:
-            key_points.append(f"主队实力占优（{five_dim['strength_h']}档 > {five_dim['strength_a']}档）")
-        elif five_dim['strength_a'] > five_dim['strength_h']:
-            key_points.append(f"客队实力占优（{five_dim['strength_a']}档 > {five_dim['strength_h']}档）")
-        else:
-            key_points.append("双方实力接近")
-
-        if five_dim['ti_ke_result'] in ["体克用", "用生体"] and five_dim['score'] > 0:
-            key_points.append(f"卦象{five_dim['ti_ke_result']} → 主队有利")
-        elif five_dim['ti_ke_result'] in ["用克体", "体生用"] and five_dim['score'] < 0:
-            key_points.append(f"卦象{five_dim['ti_ke_result']} → 客队有利")
-        elif five_dim['ping_ju_tend'] > 0.55:
-            key_points.append(f"平局倾向较高（{five_dim['ping_ju_tend']:.2f}），需防平局")
-        else:
-            key_points.append("卦象显示分胜负格局")
-
-        if abs(five_dim['correction']) > 0.1:
-            key_points.append(f"实力修正 {five_dim['correction']:+.2f}：{five_dim['correction_reason']}")
-
-        if five_dim['is_liuhe']:
-            if five_dim['liuhe_bonus'] <= 0.10:
-                key_points.append("六合卦加成减半（体生用/用克体）")
+            if first_result == "主胜":
+                second_result = "平局"
+            elif first_result == "客胜":
+                second_result = "平局"
             else:
-                key_points.append(f"六合卦提示平局可能（加成{five_dim['liuhe_bonus']:.2f}）")
+                second_result = "主胜"
 
-        if five_dim['event_correction'] > 0:
-            key_points.append(f"赛事属性修正：平局倾向 +{five_dim['event_correction']:.2f}")
+    # --- 9.6 置信度计算（三因子） ---
+    if "大吉" in gua_ji_xiong or "吉" in gua_ji_xiong:
+        gua_score = 0.9
+    elif "凶" in gua_ji_xiong:
+        gua_score = 0.5
+    else:
+        gua_score = 0.7
 
-        if five_dim['home_advantage_mod'] > 1.0:
-            key_points.append(f"主场优势增强（{five_dim['league']}）")
-        elif five_dim['home_advantage_mod'] < 1.0:
-            key_points.append(f"主场优势减弱（{five_dim['league']}）")
+    if (first_result == "主胜" and strength_diff > 0) or (first_result == "客胜" and strength_diff < 0) or (first_result == "平局" and abs(strength_diff) <= 0.5):
+        strength_score = 0.9
+    elif (first_result == "主胜" and strength_diff <= -1) or (first_result == "客胜" and strength_diff >= 1):
+        strength_score = 0.4
+    else:
+        strength_score = 0.7
 
-        for kp in key_points:
-            st.markdown(f"  • {kp}")
+    if wuxing_effect > 0:
+        wuxing_score = 0.8
+    elif wuxing_effect < 0:
+        wuxing_score = 0.5
+    else:
+        wuxing_score = 0.6
 
-        st.markdown("---")
+    confidence = gua_score * 0.4 + strength_score * 0.35 + wuxing_score * 0.25
 
-        with st.expander("🔮 五维推演详情"):
-            st.markdown(f"**综合倾向**：{five_dim['score']:+.2f}（正=主胜） | **平局倾向**：{five_dim['ping_ju_tend']:.2f}")
-            st.markdown(f"**原始卦象分**：{five_dim['score_original']:+.2f} | **实力修正**：{five_dim['correction']:+.2f}")
+    # 超级大胜封顶
+    if home_strength == 5 and away_strength <= 2 and first_result == "主胜" and first_score[0] - first_score[1] >= 2:
+        confidence = min(confidence, 0.75)
+    # 美职主场方差
+    if league_key == "美职联" and abs(home_strength - away_strength) >= 2:
+        confidence = min(confidence, 0.55)
+    # V9.3.7 美职置信度再降
+    if league_key == "美职联":
+        confidence = min(confidence, 0.45)
 
-            col1, col2, col3, col4, col5 = st.columns(5)
-            with col1:
-                st.metric("体用", f"{s.get('体用生克', 0):+.2f}")
-            with col2:
-                st.metric("卦象", f"{s.get('卦象属性', 0):+.2f}")
-            with col3:
-                st.metric("动爻", f"{s.get('动爻位置', 0):+.2f}")
-            with col4:
-                st.metric("卦气", f"{s.get('卦气旺衰', 0):+.2f}")
-            with col5:
-                st.metric("卦名", f"{s.get('卦名吉凶', 0):+.2f}")
+    confidence = int(confidence * 100)
+    if confidence > 100:
+        confidence = 100
 
-            st.markdown("**推演详情**：")
-            for d in five_dim['details']:
-                st.caption(f"• {d}")
+    # --- 9.7 方向概率修正（基于规则） ---
+    # 英超保级主场对TOP6平局溢价
+    if league_key == "英超" and home_strength <= 2 and away_strength >= 4:
+        if first_result != "平局" and second_result != "平局":
+            second_result = "平局"
+    # 超级客场平局保底
+    if away_strength == 5 and first_result != "平局" and second_result != "平局":
+        second_result = "平局"
+    # 意甲虐菜强制平局
+    if league_key == "意甲" and home_strength >= away_strength + 2 and first_result != "平局":
+        if second_result != "平局":
+            second_result = "平局"
+    # 马竞主场对中游
+    if league_key == "西甲" and home == "马德里竞技" and away_strength <= 4:
+        if first_result == "主胜" and confidence > 55:
+            confidence -= 5
+            second_result = "平局"
+    # 德甲弱队主场对欧战区强队
+    if league_key == "德甲" and home_strength <= 3 and away_strength >= 4:
+        if first_result == "客胜":
+            first_result = "平局"
+            second_result = "主胜"
+    # 西甲保级队客场保级加成
+    if league_key == "西甲" and away_strength <= 2 and "保级客场" in extra_info:
+        if first_result == "主胜":
+            first_result = "平局"
+            second_result = "客胜"
 
-        with st.expander("🔮 六爻逐爻详解"):
-            for yao in liu_factors['yao_details']:
-                dong_tag = "🔥 动爻" if yao['是否动爻'] else "静爻"
-                st.write(f"**{yao['爻位']}** ({dong_tag})")
-                st.write(f"  - 爻位取象：{yao['爻位取象']}")
-                st.write(f"  - 解读：{yao['解读']}")
+    return first_result, second_result, first_score, confidence, zhu_gua, bian_gua, gua_ji_xiong
 
-st.caption("💡 V8.8 优化版 | 基于 2026-04-17 赛果校准 | 开源参考，理性娱乐")
+# ============================================================
+# 10. Streamlit 界面
+# ============================================================
+def main():
+    st.markdown("""
+    **使用说明**：  
+    输入比赛信息（联赛，日期时间，主队 vs 客队），每行一场。  
+    例如：`欧冠，05-02 03:00，巴黎圣曼 vs 拜仁`
+    """)
+    user_input = st.text_area("📝 粘贴比赛列表", height=300)
+    if st.button("🚀 预测"):
+        if not user_input.strip():
+            st.warning("请至少输入一场比赛")
+            return
+        lines = user_input.strip().split('\n')
+        results = []
+        for line in lines:
+            if not line.strip():
+                continue
+            parts = line.split('，')
+            if len(parts) < 3:
+                st.error(f"格式错误：{line}，请用中文逗号分隔")
+                continue
+            league = parts[0].strip()
+            date_time = parts[1].strip()
+            teams = parts[2].split(' vs ')
+            if len(teams) != 2:
+                st.error(f"球队格式错误：{line}，请使用 ' vs ' 分隔")
+                continue
+            home = teams[0].strip()
+            away = teams[1].strip()
+            # 简单判断战意（可根据需要扩展）
+            zhan_yi = 1.0
+            extra = ""
+            if "决赛" in league or "杯" in league:
+                zhan_yi = 1.2
+            if "保级" in line.lower():
+                extra += "保级 "
+            if "季后赛" in league:
+                extra += "季后赛 "
+            if "淘汰赛" in league:
+                extra += "淘汰赛 "
+            # 其他extra逻辑可增加
+
+            first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away, zhan_yi, extra)
+            results.append({
+                "league": league,
+                "date": date_time,
+                "home": home,
+                "away": away,
+                "first": first,
+                "second": second,
+                "score": f"{score[0]}-{score[1]}",
+                "conf": conf,
+                "zhu_gua": zhu,
+                "bian_gua": bian,
+                "gua_ji": gua
+            })
+
+        # 显示结果
+        for r in results:
+            st.markdown(f"**{r['league']} {r['date']} {r['home']} vs {r['away']}**")
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("首推", r['first'])
+            col2.metric("次推", r['second'])
+            col3.metric("比分", r['score'])
+            col4.metric("置信度", f"{r['conf']}%")
+            st.caption(f"卦象：{r['zhu_gua']}→{r['bian_gua']}，{r['gua_ji']}")
+            st.divider()
+
+if __name__ == "__main__":
+    main()
