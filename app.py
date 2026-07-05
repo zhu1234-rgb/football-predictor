@@ -7,8 +7,8 @@ from datetime import datetime
 # 1. 页面配置
 # ============================================================
 st.set_page_config(page_title="⚽ 六爻·纯卦象预测", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎")
-st.caption("优化版 V6 | 六合卦平局加成减半 | 体生用/用克体客队优先")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V7")
+st.caption("实力修正版 | 实力差距≥2档时自动修正卦象 | 用生体+客强时不再误判")
 
 # ============================================================
 # 2. 赛事列表
@@ -46,7 +46,39 @@ ZHAN_YI_LIST = [
 ]
 
 # ============================================================
-# 4. 卦象数据
+# 4. 球队实力分层（V7新增：用于修正卦象）
+# ============================================================
+TEAM_STRENGTH = {
+    # 第1档：超级强队（世界级）
+    "巴西": 5, "阿根廷": 5, "法国": 5, "英格兰": 5, "西班牙": 5, 
+    "德国": 5, "葡萄牙": 5, "比利时": 5, "荷兰": 5, "意大利": 5,
+    # 第2档：强队
+    "克罗地亚": 4, "乌拉圭": 4, "瑞士": 4, "瑞典": 4, "丹麦": 4,
+    "墨西哥": 4, "美国": 4, "塞内加尔": 4, "摩洛哥": 4, "日本": 4,
+    "韩国": 4, "澳大利亚": 4, "尼日利亚": 4, "哥伦比亚": 4,
+    # 第3档：中游队
+    "厄瓜多尔": 3, "巴拉圭": 3, "智利": 3, "秘鲁": 3, "土耳其": 3,
+    "奥地利": 3, "苏格兰": 3, "挪威": 3, "乌克兰": 3, "伊朗": 3,
+    "沙特阿拉伯": 3, "卡塔尔": 3, "阿联酋": 3, "阿尔及利亚": 3,
+    "科特迪瓦": 3, "加纳": 3, "埃及": 3, "突尼斯": 3,
+    # 第4档：弱队
+    "新西兰": 2, "加拿大": 2, "佛得角": 2, "库拉索": 2,
+    "波黑": 2, "斯洛伐克": 2, "捷克": 2, "南非": 2,
+    "伊拉克": 2, "约旦": 2, "乌兹别克斯坦": 2, "巴拿马": 2,
+    "海地": 2, "刚果(金)": 2,
+}
+def get_strength(team):
+    """获取球队实力档位（1-5，5最强）"""
+    # 处理带括号的队名
+    clean_name = team.split('(')[0].strip()
+    return TEAM_STRENGTH.get(clean_name, TEAM_STRENGTH.get(team, 3))
+
+def get_strength_label(score):
+    labels = {5: "超级强队", 4: "强队", 3: "中游", 2: "弱队", 1: "鱼腩"}
+    return labels.get(score, "中游")
+
+# ============================================================
+# 5. 卦象数据
 # ============================================================
 GUA_LEI_XIANG = {
     "乾": {"五行":"金","比赛":"冠军、强势方、大胜"},
@@ -72,7 +104,7 @@ def get_gua_style(gua):
     return GUA_XING_QING.get(gua, "常规打法")
 
 # ============================================================
-# 5. 卦象数据结构
+# 6. 卦象数据结构
 # ============================================================
 GUA_LIST = [
     "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
@@ -102,7 +134,7 @@ YOUHUN_SET = {"需","讼","明夷","晋","中孚","大过","颐","大壮"}
 LIUCHONG_SET = {"乾","坎","兑","离","震","巽","艮","坤"}
 
 # ============================================================
-# 6. 卦名吉凶评级
+# 7. 卦名吉凶评级
 # ============================================================
 GUA_JI_XIONG = {
     "泰":"大吉，主队有利", "否":"大凶，客队有利", "谦":"大吉，主队有利",
@@ -128,7 +160,7 @@ def get_gua_ji_xiong(gua):
     return GUA_JI_XIONG.get(gua, "中，常规卦象")
 
 # ============================================================
-# 7. 自动起卦函数（队名起卦）
+# 8. 自动起卦函数（队名起卦）
 # ============================================================
 def auto_gua_by_teams(home, away):
     combined = f"{home}_{away}"
@@ -143,7 +175,7 @@ def auto_gua_by_teams(home, away):
     return GUA_LIST[zhu_index], GUA_LIST[bian_index], dong_yao
 
 # ============================================================
-# 8. 五行生克
+# 9. 五行生克
 # ============================================================
 def wuxing_sheng_ke(wo, ta):
     sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
@@ -156,7 +188,7 @@ def wuxing_sheng_ke(wo, ta):
     else: return 0
 
 # ============================================================
-# 9. 六爻逐爻详解
+# 10. 六爻逐爻详解
 # ============================================================
 def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     yao_names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
@@ -201,9 +233,9 @@ def analyze_yaos(zhu_gua, bian_gua, dong_yao):
     return yao_list
 
 # ============================================================
-# 10. 五维推演核心函数（V6最终优化版）
+# 11. 五维推演 + 实力修正（V7核心）
 # ============================================================
-def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
+def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, home_team, away_team, match_time=None):
     score = 0.0
     details = []
     scores_detail = {}
@@ -257,10 +289,8 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     attr_score = 0
     attr_detail = []
     
-    # 检测六合卦
     if zhu_gua in LIUHE_SET:
         is_liuhe = True
-        # ★★★ 核心优化：体生用/用克体时，六合卦平局加成减半 ★★★
         if ti_ke_result in ["体生用", "用克体"]:
             attr_score += 0.08
             attr_detail.append("六合卦（体生用/用克体→加成减半）")
@@ -344,11 +374,59 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     scores_detail["卦名吉凶"] = jx_score
 
     # ============================================================
-    # ★★★ 综合判断（V6最终优化）★★★
+    # ★★★ V7核心：实力修正逻辑 ★★★
+    # ============================================================
+    strength_h = get_strength(home_team)
+    strength_a = get_strength(away_team)
+    strength_diff = strength_h - strength_a  # 正=主队强，负=客队强
+    strength_h_label = get_strength_label(strength_h)
+    strength_a_label = get_strength_label(strength_a)
+    
+    details.append(f"实力对比：主队{strength_h_label}({strength_h}) vs 客队{strength_a_label}({strength_a})")
+    
+    # 实力修正系数（当客队明显强于主队时）
+    correction = 0
+    correction_reason = ""
+    
+    if strength_a - strength_h >= 2:
+        # 客队比主队强2档以上 → 强力修正
+        correction = -0.40
+        correction_reason = "客队实力强2档以上→卦象向客队修正"
+        details.append(f"实力修正：{correction_reason}")
+    elif strength_a - strength_h >= 1:
+        # 客队比主队强1档 → 温和修正
+        correction = -0.20
+        correction_reason = "客队实力强1档→温和修正"
+        details.append(f"实力修正：{correction_reason}")
+    elif strength_h - strength_a >= 2:
+        # 主队比客队强2档以上 → 向主队修正
+        correction = 0.30
+        correction_reason = "主队实力强2档以上→向主队修正"
+        details.append(f"实力修正：{correction_reason}")
+    elif strength_h - strength_a >= 1:
+        correction = 0.15
+        correction_reason = "主队实力强1档→温和修正"
+        details.append(f"实力修正：{correction_reason}")
+    else:
+        details.append("实力修正：双方实力接近，无需修正")
+    
+    # 应用实力修正
+    score_original = score
+    score = score + correction * 0.5  # 修正系数权重0.5
+    
+    # 特殊规则：当用生体（客生主）但客队实力明显强于主队时，直接反转为客队有利
+    if ti_ke_result == "用生体" and strength_a - strength_h >= 1:
+        score = -0.20
+        details.append("特殊修正：用生体+客队更强 → 反转为主队消耗，客队有利")
+        ti_ke_result_modified = "体生用(客强修正)"
+    else:
+        ti_ke_result_modified = ti_ke_result
+
+    # ============================================================
+    # ★★★ 综合判断（V7 ★★★
     # ============================================================
     
-    # 1. 计算平局倾向基础值
-    # 当score偏向客队时，平局倾向应降低，而不是升高
+    # 计算平局倾向
     abs_score = abs(score)
     if abs_score > 0.3:
         ping_ju_base = 0.25
@@ -359,39 +437,38 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
     else:
         ping_ju_base = 0.55
     
-    # 2. 六合卦加成（体生用/用克体时减半）
     liuhe_bonus = 0.0
     if is_liuhe:
         if ti_ke_result in ["体生用", "用克体"]:
-            liuhe_bonus = 0.10  # 减半
-            details.append("六合卦加成：减半（体生用/用克体）")
+            liuhe_bonus = 0.10
         else:
             liuhe_bonus = 0.20
-            details.append("六合卦加成：正常")
     elif bian_gua in LIUHE_SET:
         liuhe_bonus = 0.08
-        details.append("变卦六合加成：+0.08")
     
-    # 3. 最终平局倾向
     ping_ju_tend = min(ping_ju_base + liuhe_bonus, 0.88)
     ping_ju_tend = max(0.10, ping_ju_tend)
     
-    # 4. 首推判断
-    # 优先看体用生克（主判断）
-    if ti_ke_result == "用克体":
+    # 首推判断（优先体用生克，但应用实力修正后的结果）
+    if ti_ke_result_modified in ["用克体", "体生用(客强修正)"]:
         first = "客胜"
         second = "平局"
-    elif ti_ke_result == "体克用":
+    elif ti_ke_result_modified in ["体克用", "用生体(主强修正)"]:
         first = "主胜"
         second = "平局"
-    elif ti_ke_result == "体生用":
+    elif ti_ke_result_modified == "用生体":
+        # 用生体时，检查实力差距
+        if strength_h - strength_a >= 1:
+            first = "主胜"
+            second = "平局"
+        else:
+            # 实力接近或客队更强时，用生体可能只是表面
+            first = "平局"
+            second = "客胜"
+    elif ti_ke_result_modified == "体生用":
         first = "客胜"
-        second = "平局"
-    elif ti_ke_result == "用生体":
-        first = "主胜"
         second = "平局"
     else:
-        # 比和或均衡时，看平局倾向
         if ping_ju_tend > 0.55:
             first = "平局"
             second = "主胜" if score > 0 else "客胜"
@@ -402,10 +479,21 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
             first = "客胜"
             second = "平局" if ping_ju_tend > 0.4 else "主胜"
 
+    # 最终比分参考（基于首推）
+    if first == "平局":
+        score_hint = "0-0 / 1-1"
+    elif first == "主胜":
+        score_hint = "2-1 / 1-0"
+    else:
+        score_hint = "0-1 / 1-2"
+
     return {
         "first": first,
         "second": second,
         "score": round(score, 2),
+        "score_original": round(score_original, 2),
+        "correction": round(correction, 2),
+        "correction_reason": correction_reason,
         "ping_ju_tend": round(ping_ju_tend, 2),
         "details": details,
         "scores_detail": scores_detail,
@@ -413,12 +501,18 @@ def five_dimension_analysis(zhu_gua, bian_gua, dong_yao, match_time=None):
         "gua_wuxing": gua_wuxing,
         "ji_xiong": ji_xiong,
         "ti_ke_result": ti_ke_result,
+        "ti_ke_result_modified": ti_ke_result_modified,
         "is_liuhe": is_liuhe,
-        "liuhe_bonus": liuhe_bonus
+        "liuhe_bonus": liuhe_bonus,
+        "strength_h": strength_h,
+        "strength_a": strength_a,
+        "strength_h_label": strength_h_label,
+        "strength_a_label": strength_a_label,
+        "score_hint": score_hint
     }
 
 # ============================================================
-# 11. 自动解卦函数
+# 12. 自动解卦函数
 # ============================================================
 def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     gua_analysis = []
@@ -445,7 +539,7 @@ def auto_jie_gua(zhu_gua, bian_gua, dong_yao):
     }
 
 # ============================================================
-# 12. 界面布局
+# 13. 界面布局
 # ============================================================
 if 'zhu_gua' not in st.session_state:
     st.session_state.zhu_gua = "乾"
@@ -469,7 +563,7 @@ zhan_yi_opt = st.selectbox("⚔️ 战意系数", ZHAN_YI_LIST, format_func=lamb
 zhan_yi = zhan_yi_opt[1]
 
 # ============================================================
-# 13. 预测按钮 + 手机友好输出
+# 14. 预测按钮 + 手机友好输出
 # ============================================================
 if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
     if not home_team.strip() or not away_team.strip():
@@ -480,7 +574,7 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         st.session_state.bian_gua = bian
         st.session_state.dong_yao = dong
 
-        five_dim = five_dimension_analysis(zhu, bian, dong, match_time)
+        five_dim = five_dimension_analysis(zhu, bian, dong, home_team, away_team, match_time)
         
         liu_factors = auto_jie_gua(zhu, bian, dong)
         st.session_state.liu_result = liu_factors
@@ -493,6 +587,7 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown(f"### 📊 {home_team} vs {away_team}")
         st.caption(f"{league} | {time_str} | {zhan_yi_name}")
+        st.caption(f"实力评级：主队{five_dim['strength_h_label']}({five_dim['strength_h']}) vs 客队{five_dim['strength_a_label']}({five_dim['strength_a']})")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -506,8 +601,9 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("**五维推演**")
         st.caption(f"综合倾向：{five_dim['score']:+.2f}（正=主胜） | 平局倾向：{five_dim['ping_ju_tend']:.2f}")
+        st.caption(f"原始卦象分：{five_dim['score_original']:+.2f} | 实力修正：{five_dim['correction']:+.2f} ({five_dim['correction_reason']})")
         if five_dim['is_liuhe']:
-            st.caption(f"六合卦加成：{five_dim['liuhe_bonus']:.2f}（{'减半' if five_dim['ti_ke_result'] in ['体生用','用克体'] else '正常'}）")
+            st.caption(f"六合卦加成：{five_dim['liuhe_bonus']:.2f}")
         
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
@@ -529,26 +625,22 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
         
         st.markdown("---")
         
-        # 比分参考（双方向输出）
-        if five_dim['first'] == "平局":
-            score_hint = f"平局：0-0 / 1-1；{five_dim['second']}：0-1 / 1-2"
-        elif five_dim['first'] == "主胜":
-            score_hint = "主胜：2-1 / 1-0；平局：1-1 / 0-0"
-        else:
-            score_hint = "客胜：0-1 / 1-2；平局：1-1 / 0-0"
         st.markdown(f"**比分参考**")
-        st.caption(score_hint)
+        st.caption(five_dim['score_hint'])
         
         st.markdown("---")
         
         st.markdown(f"**卦象**：{zhu} → {bian}　|　**动爻**：{dong}")
         st.caption(f"卦气：{five_dim['gua_wuxing']}（月建{five_dim['month_wuxing']}）")
         st.caption(f"卦名吉凶：{five_dim['ji_xiong']}")
-        st.caption(f"体用生克关系：{five_dim['ti_ke_result']}")
+        st.caption(f"体用生克：{five_dim['ti_ke_result']} → {five_dim['ti_ke_result_modified']}")
         
         with st.expander("🔮 详细卦象解读（含逐爻详解）"):
             st.write(f"**主卦**：{zhu}　|　**变卦**：{bian}　|　**动爻**：{dong}")
-            st.write(f"**体用生克关系**：{five_dim['ti_ke_result']}")
+            st.write(f"**实力对比**：主队{five_dim['strength_h_label']}({five_dim['strength_h']}) vs 客队{five_dim['strength_a_label']}({five_dim['strength_a']})")
+            st.write(f"**体用生克**：{five_dim['ti_ke_result']} → {five_dim['ti_ke_result_modified']}")
+            st.write(f"**原始卦象分**：{five_dim['score_original']:+.2f}")
+            st.write(f"**实力修正**：{five_dim['correction']:+.2f}")
             st.write(f"**综合倾向分**：{five_dim['score']:+.2f}")
             st.write(f"**平局倾向**：{five_dim['ping_ju_tend']:.2f}")
             st.write("**五维得分**：")
@@ -565,4 +657,4 @@ if st.button("🚀 纯卦象预测", type="primary", use_container_width=True):
                 st.write(f"  - 爻位取象：{yao['爻位取象']}")
                 st.write(f"  - 解读：{yao['解读']}")
 
-st.caption("💡 V6优化：体用生克优先 | 六合卦体生用/用克体时加成减半 | 平局倾向封顶0.88")
+st.caption("💡 V7实力修正版：根据球队实力档位自动修正卦象 | 实力差距≥2档时强力修正")
