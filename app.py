@@ -6,9 +6,9 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（原始完整版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（原始完整版）")
-st.caption("包含全部修正规则（含自动保级/无欲标签）| 起卦只依赖日期")
+st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（单场输入版）", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（单场输入版）")
+st.caption("包含全部修正规则（含自动保级/无欲标签）| 起卦只依赖日期 | 手动输入单场比赛")
 
 # ============================================================
 # 2. 联赛基准进球（完整版）
@@ -236,7 +236,7 @@ def predict_match(league, date_time, home, away):
 
     # ---- 比分离散化（无方向奖励，原始） ----
     total = exp
-    home_ratio = 0.5 + diff * 0.05  # 原始主场系数
+    home_ratio = 0.5 + diff * 0.05
     home_ratio = max(0.3, min(0.7, home_ratio))
     home_exp = total * home_ratio
     away_exp = total * (1 - home_ratio)
@@ -315,40 +315,34 @@ def predict_match(league, date_time, home, away):
     return first_res, second_res, first_score, conf, zhu, bian, gua_ji
 
 # ============================================================
-# 7. Streamlit 界面
+# 7. Streamlit 界面（单场手动输入版）
 # ============================================================
 def main():
-    st.markdown("""
-    **输入格式**：每行 `联赛，日期时间，主队 vs 客队`  
-    **注意**：起卦只使用日期部分（如 `07-06`），时间分钟不影响结果。  
-    示例：`挪甲，07-05 00:00，奥德 vs 海于格松`
-    """)
-    user_input = st.text_area("📝 粘贴比赛列表", height=300)
+    st.markdown("### 请输入单场比赛信息")
+
+    # 四个输入框
+    league = st.text_input("联赛", placeholder="例如：瑞典超")
+    date_time = st.text_input("日期时间", placeholder="例如：07-07 01:00")
+    home = st.text_input("主队", placeholder="例如：赫根")
+    away = st.text_input("客队", placeholder="例如：佐加顿斯")
+
     if st.button("🚀 预测"):
-        if not user_input.strip():
-            st.warning("请输入至少一场比赛")
+        # 检查是否填全
+        if not league or not date_time or not home or not away:
+            st.warning("请完整填写所有字段")
             return
-        lines = user_input.strip().split('\n')
-        for line in lines:
-            if not line.strip(): continue
-            parts = line.split('，')
-            if len(parts)<3:
-                st.error(f"格式错误：{line}")
-                continue
-            league, date_time, teams = parts[0].strip(), parts[1].strip(), parts[2].strip()
-            if ' vs ' not in teams:
-                st.error(f"缺少 vs 分隔：{line}")
-                continue
-            home, away = teams.split(' vs ')
-            first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away)
-            st.markdown(f"**{league} {date_time} {home} vs {away}**")
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("首推方向", first)
-            col2.metric("次推方向", second)
-            col3.metric("预测比分", f"{score[0]}-{score[1]}")
-            col4.metric("置信度", f"{conf}%")
-            st.caption(f"卦象：{zhu}→{bian}，{gua}")
-            st.divider()
+
+        # 调用预测函数
+        first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away)
+
+        # 显示结果
+        st.success("预测结果")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("首推方向", first)
+        col2.metric("次推方向", second)
+        col3.metric("预测比分", f"{score[0]}-{score[1]}")
+        col4.metric("置信度", f"{conf}%")
+        st.caption(f"卦象：{zhu}→{bian}，{gua}")
 
 if __name__ == "__main__":
     main()
