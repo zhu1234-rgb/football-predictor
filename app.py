@@ -92,7 +92,8 @@ def wuxing_sheng_ke(wo, ta):
     elif ke[ta] == wo:      # 用克体 → 客队有利
         return -0.3
     else:
-        return 0.0# -*- coding: utf-8 -*-
+        return 0.0
+        # -*- coding: utf-8 -*-
 """
 六爻足球预测（完整版）—— 第二部分：逻辑层
 包含：队名哈希取卦、时间定动爻、变卦生成、体用判定、胜平负综合决策
@@ -270,7 +271,8 @@ def predict_football(home, away, dt):
         "卦象吉凶": ji,
         "五行权重": shengke
     }
-    return final, info# -*- coding: utf-8 -*-
+    return final, info
+    # -*- coding: utf-8 -*-
 """
 六爻足球预测（完整版）—— 第三部分：界面层
 基于 Streamlit 的交互界面，输入框无占位文字，仅输出胜平负及卦象详情
@@ -335,4 +337,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
