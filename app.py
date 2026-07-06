@@ -1,358 +1,338 @@
-import streamlit as st
-import math
-import hashlib
-from datetime import datetime
+# -*- coding: utf-8 -*-
+"""
+六爻足球预测（完整版）—— 第一部分：数据层
+包含：六十四卦完整列表、上下卦映射表、八卦五行、卦象吉凶倾向、五行生克函数
+"""
 
-# ============================================================
-# 1. 页面配置
-# ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（修正版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（修正版）")
-st.caption("已注释自动保级/无欲标签，避免过度平局修正 | 起卦只依赖日期")
-
-# ============================================================
-# 2. 联赛基准进球（完整版）
-# ============================================================
-LEAGUE_AVG_TOTAL = {
-    "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
-    "欧冠": 2.6, "欧联": 2.6, "欧协联": 2.5,
-    "日职": 2.4, "日乙": 2.3, "K联赛": 2.3, "K2联赛": 2.2,
-    "世界杯": 2.2, "亚洲杯": 2.2, "非洲杯": 2.1, "美洲杯": 2.3, "欧洲杯": 2.4,
-    "国际友谊赛": 2.8, "芬超": 2.4, "芬甲": 2.3, "挪甲": 2.4,
-    "瑞典超": 2.5, "冰岛超": 2.4, "爱超": 2.3, "爱甲": 2.2,
-    "苏超": 2.5, "英冠": 2.6, "英甲": 2.5, "英乙": 2.4,
-    "荷甲": 2.7, "荷乙": 2.6, "葡超": 2.5, "比甲": 2.5,
-    "土超": 2.4, "俄超": 2.3, "奥甲": 2.4, "瑞士超": 2.4,
-    "丹超": 2.5, "波超": 2.3, "克甲": 2.3, "巴西甲": 2.4,
-    "巴西乙": 2.3, "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
-    "中超": 2.5, "澳超": 2.6, "沙特联": 2.5, "阿联酋超": 2.4,
-    "卡塔尔联": 2.3, "女足世界杯": 2.0, "女足英超": 2.2,
-    "意乙": 2.3, "亚冠": 2.4, "英足总杯": 2.6, "解放者杯": 2.3,
-    "亚冠乙": 2.4, "国王杯": 2.4, "荷兰杯": 2.5, "德国杯": 2.6,
-    "意大利杯": 2.4, "法国杯": 2.5, "足总杯": 2.6,
+# ---------- 1.1 八卦数字映射（乾1兑2离3震4巽5坎6艮7坤8）----------
+NUM_TO_GUA = {
+    1: "乾", 2: "兑", 3: "离", 4: "震",
+    5: "巽", 6: "坎", 7: "艮", 8: "坤"
 }
 
-# ============================================================
-# 3. 球队实力分层（完整版）
-# ============================================================
-TEAM_STRENGTH = {
-    "巴西":5, "阿根廷":5, "法国":5, "英格兰":5, "西班牙":5,
-    "德国":5, "葡萄牙":5, "比利时":5, "荷兰":5, "意大利":5,
-    "拜仁慕尼黑":5, "巴黎圣日耳曼":5, "皇家马德里":5, "巴塞罗那":5,
-    "曼城":5, "利物浦":5, "阿森纳":5, "国际米兰":5,
-    "马德里竞技":5, "勒沃库森":4, "多特蒙德":4,
-    "博德闪耀":5, "本菲卡":5,
-    "尤文图斯":4, "AC米兰":4, "那不勒斯":4, "亚特兰大":4,
-    "莱比锡红牛":4, "塞维利亚":3, "毕尔巴鄂竞技":4, "比利亚雷亚尔":4,
-    "阿斯顿维拉":3, "切尔西":3, "曼联":4, "热刺":4,
-    "纽卡斯尔联":4, "西汉姆联":4, "布伦特福德":4,
-    "克罗地亚":4, "乌拉圭":4, "瑞士":4, "瑞典":4, "丹麦":4,
-    "墨西哥":4, "美国":4, "塞内加尔":4, "摩洛哥":4, "日本":4,
-    "韩国":4, "澳大利亚":4, "尼日利亚":4, "哥伦比亚":4,
-    "蔚山现代":4, "全北现代":3, "浦项制铁":4, "马尔默":3,
-    "赫尔辛基":3, "莫尔德":4, "利雅得胜利":4, "吉达国民":4,
-    "吉达联合":4, "水晶宫":4, "利雅得新月":4, "大阪钢巴":4,
-    "神户胜利船":4, "皇家社会":3, "里尔":4, "波尔图":4,
-    "里斯本竞技":4, "罗马":4, "拉齐奥":4, "佛罗伦萨":4,
-    "科林蒂安":4, "帕尔梅拉斯":4, "弗拉门戈":4, "弗鲁米嫩塞":4,
-    "博卡青年":4, "河床":4, "弗赖堡":4, "布拉加":4,
-    "诺丁汉森林":4, "雅典AEK":4, "斯特拉斯":3, "霍芬海姆":4,
-    "奥格斯堡":4, "洛里昂":4, "伯恩茅斯":4, "里昂":4,
-    "布兰":4, "拉斯决心":4, "新未来城":3, "通德拉":3,
-    "伊普斯":3, "浦和红钻":3, "仁川联":4, "江原FC":4,
-    "福冈黄蜂":4, "天狼星":4, "赫塔费":4, "尼斯":4,
-    "布赖合作":4, "艾禾斯堡":3, "勒芒":3, "阿尔梅勒":3,
-    "圣保利":3, "克莱蒙":3, "阿维SAD":3, "夏洛特FC":3,
-    "圣何塞地震":3, "安养FC":3, "利勒斯特":3, "麦克阿瑟":3,
-    "芬洛":3, "不伦瑞克":3, "阿拉维斯":3, "埃尔切":3,
-    "莱万特":3, "科莫":3, "敦刻尔克":3, "海登海姆":4,
-    "厄瓜多尔":3, "巴拉圭":3, "智利":3, "秘鲁":3, "土耳其":3,
-    "奥地利":3, "苏格兰":3, "挪威":3, "乌克兰":3, "伊朗":3,
-    "沙特阿拉伯":3, "卡塔尔":3, "阿联酋":3, "阿尔及利亚":3,
-    "科特迪瓦":3, "加纳":3, "埃及":3, "突尼斯":3,
-    "匈牙利":3, "罗马尼亚":3, "威尔士":3, "希腊":3, "黑山":3,
-    "斯洛文尼亚":3, "塞尔维亚":3, "塞尔塔":3, "贝蒂斯":3,
-    "巴列卡诺":3, "美因茨":3, "水晶体育":3, "麦德林":3,
-    "新西兰":2, "加拿大":2, "佛得角":2, "库拉索":2,
-    "波黑":2, "斯洛伐克":2, "捷克":2, "南非":2,
-    "伊拉克":2, "约旦":2, "乌兹别克斯坦":2, "巴拿马":2,
-    "海地":2, "刚果(金)":2, "富川FC":2, "拉赫蒂":2,
-    "玛丽港":2, "哈卡":2, "桑德兰":2, "利兹联":2,
-    "伯恩利":2, "沃特福德":2, "莱万特":2, "西班牙人":2,
-    "马略卡":2, "阿拉维斯":2, "加的斯":2, "奥维耶多":2,
-    "科莫":2, "莱切":2, "比萨":2, "恩波利":2,
-    "赫尔城":2, "牛津联":2, "米尔沃尔":2, "朴次茅斯":2,
-    "布莱克本":2, "西布朗":2, "雷克斯汉姆":2, "斯旺西":2,
-    "伯明翰":2, "诺维奇":2, "考文垂":2, "女王巡游":2,
-    "米堡":2, "麦克阿瑟":2, "纽卡斯托":2, "阿德莱德联":2,
-    "西悉尼":2, "珀斯光荣":2, "中央海岸":2, "布里斯班":2,
-    "惠灵顿凤凰":2, "墨尔本胜利":2, "奥克兰FC":2, "悉尼FC":2,
-    "墨尔本城":2, "清水鼓动":2, "町田泽维亚":2, "京都不死鸟":2,
-    "名古屋鲸":2, "浦和红钻":2, "鹿岛鹿角":2, "金泉尚武":2,
-    "基多大学":2,
-    # ---------- 新增补全 ----------
-    "尤文图德": 2,
-    "埃尔夫斯堡": 3,
-    "哈马比": 3,
-    "海于格松": 3,
-    "奥德": 3,
-    "MP米克": 3,
-    "哈卡": 3,
-    "累西腓航海": 2,
+# ---------- 1.2 六十四卦上下卦组合映射表（完整64条）----------
+GUA_MAP = {
+    # 乾宫
+    ("乾", "乾"): "乾", ("乾", "坤"): "否", ("乾", "震"): "无妄",
+    ("乾", "巽"): "姤", ("乾", "坎"): "讼", ("乾", "离"): "同人",
+    ("乾", "艮"): "遁", ("乾", "兑"): "履",
+    # 坤宫
+    ("坤", "乾"): "泰", ("坤", "坤"): "坤", ("坤", "震"): "复",
+    ("坤", "巽"): "升", ("坤", "坎"): "师", ("坤", "离"): "明夷",
+    ("坤", "艮"): "谦", ("坤", "兑"): "临",
+    # 震宫
+    ("震", "乾"): "大壮", ("震", "坤"): "豫", ("震", "震"): "震",
+    ("震", "巽"): "恒", ("震", "坎"): "解", ("震", "离"): "丰",
+    ("震", "艮"): "小过", ("震", "兑"): "归妹",
+    # 巽宫
+    ("巽", "乾"): "小畜", ("巽", "坤"): "观", ("巽", "震"): "益",
+    ("巽", "巽"): "巽", ("巽", "坎"): "涣", ("巽", "离"): "家人",
+    ("巽", "艮"): "渐", ("巽", "兑"): "中孚",
+    # 坎宫
+    ("坎", "乾"): "需", ("坎", "坤"): "比", ("坎", "震"): "屯",
+    ("坎", "巽"): "井", ("坎", "坎"): "坎", ("坎", "离"): "既济",
+    ("坎", "艮"): "蹇", ("坎", "兑"): "节",
+    # 离宫
+    ("离", "乾"): "大有", ("离", "坤"): "晋", ("离", "震"): "噬嗑",
+    ("离", "巽"): "鼎", ("离", "坎"): "未济", ("离", "离"): "离",
+    ("离", "艮"): "旅", ("离", "兑"): "睽",
+    # 艮宫
+    ("艮", "乾"): "大畜", ("艮", "坤"): "剥", ("艮", "震"): "颐",
+    ("艮", "巽"): "蛊", ("艮", "坎"): "蒙", ("艮", "离"): "贲",
+    ("艮", "艮"): "艮", ("艮", "兑"): "损",
+    # 兑宫
+    ("兑", "乾"): "夬", ("兑", "坤"): "萃", ("兑", "震"): "随",
+    ("兑", "巽"): "大过", ("兑", "坎"): "困", ("兑", "离"): "革",
+    ("兑", "艮"): "咸", ("兑", "兑"): "兑"
 }
 
-def get_strength(team):
-    clean = team.split('(')[0].strip()
-    return TEAM_STRENGTH.get(clean, TEAM_STRENGTH.get(team, 3))
-
-# ============================================================
-# 4. 卦象数据库
-# ============================================================
-GUA_LIST = [
-    "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
-    "随","蛊","临","观","噬嗑","贲","剥","复","无妄","大畜","颐","大过","坎","离",
-    "咸","恒","遁","大壮","晋","明夷","家人","睽","蹇","解","损","益","夬","姤",
-    "萃","升","困","井","革","鼎","震","艮","渐","归妹","丰","旅","巽","兑",
-    "涣","节","中孚","小过","既济","未济"
-]
-GUA_LEI_XIANG = {
-    "乾":{"五行":"金","比赛":"冠军"}, "坤":{"五行":"土","比赛":"防守"},
-    "震":{"五行":"木","比赛":"冲击"}, "巽":{"五行":"木","比赛":"边路"},
-    "坎":{"五行":"水","比赛":"防守"}, "离":{"五行":"火","比赛":"进攻"},
-    "艮":{"五行":"土","比赛":"铁桶"}, "兑":{"五行":"金","比赛":"突破"}
+# ---------- 1.3 八卦五行属性 ----------
+GUA_WUXING = {
+    "乾": "金", "兑": "金", "离": "火", "震": "木",
+    "巽": "木", "坎": "水", "艮": "土", "坤": "土"
 }
+
+# ---------- 1.4 卦象吉凶倾向（预测方向）----------
 GUA_JI_XIONG = {
-    "泰":"大吉，主队有利","否":"大凶，客队有利","谦":"大吉，主队有利",
-    "豫":"吉，主队有利","随":"吉，主队有利","蛊":"凶，客队有利",
-    "临":"吉，主队有利","观":"中，平局倾向","噬嗑":"中，客队有利",
-    "贲":"中，主队有利","剥":"凶，客队有利","复":"吉，主队有利",
-    "无妄":"吉，主队有利","大畜":"吉，主队有利","颐":"中，平局倾向",
-    "大过":"凶，客队有利","坎":"凶，客队有利","离":"中，主队有利",
-    "咸":"吉，主队有利","恒":"中，平局倾向","遁":"凶，客队有利",
-    "大壮":"吉，主队有利","晋":"吉，主队有利","明夷":"凶，客队有利",
-    "家人":"吉，主队有利","睽":"凶，客队有利","蹇":"凶，客队有利",
-    "解":"吉，主队有利","损":"凶，客队有利","益":"吉，主队有利",
-    "夬":"中，主队有利","姤":"中，平局倾向","萃":"吉，主队有利",
-    "升":"吉，主队有利","困":"凶，客队有利","井":"中，平局倾向",
-    "革":"中，客队有利","鼎":"吉，主队有利","震":"中，平局倾向",
-    "艮":"中，平局倾向","渐":"吉，主队有利","归妹":"中，客队有利",
-    "丰":"吉，主队有利","旅":"凶，客队有利","巽":"中，平局倾向",
-    "兑":"吉，主队有利","涣":"凶，客队有利","节":"中，平局倾向",
-    "中孚":"吉，主队有利","小过":"中，客队有利","既济":"吉，主队有利",
-    "未济":"凶，客队有利","乾":"大吉，主队有利","坤":"中，平局倾向",
+    "乾": "主队有利", "坤": "平局倾向", "屯": "主队有利", "蒙": "客队有利",
+    "需": "主队有利", "讼": "客队有利", "师": "主队有利", "比": "主队有利",
+    "小畜": "主队有利", "履": "主队有利", "泰": "主队有利", "否": "客队有利",
+    "同人": "主队有利", "大有": "主队有利", "谦": "主队有利", "豫": "主队有利",
+    "随": "主队有利", "蛊": "客队有利", "临": "主队有利", "观": "平局倾向",
+    "噬嗑": "客队有利", "贲": "主队有利", "剥": "客队有利", "复": "主队有利",
+    "无妄": "主队有利", "大畜": "主队有利", "颐": "平局倾向", "大过": "客队有利",
+    "坎": "客队有利", "离": "主队有利", "咸": "主队有利", "恒": "平局倾向",
+    "遁": "客队有利", "大壮": "主队有利", "晋": "主队有利", "明夷": "客队有利",
+    "家人": "主队有利", "睽": "客队有利", "蹇": "客队有利", "解": "主队有利",
+    "损": "客队有利", "益": "主队有利", "夬": "主队有利", "姤": "平局倾向",
+    "萃": "主队有利", "升": "主队有利", "困": "客队有利", "井": "平局倾向",
+    "革": "客队有利", "鼎": "主队有利", "震": "平局倾向", "艮": "平局倾向",
+    "渐": "主队有利", "归妹": "客队有利", "丰": "主队有利", "旅": "客队有利",
+    "巽": "平局倾向", "兑": "主队有利", "涣": "客队有利", "节": "平局倾向",
+    "中孚": "主队有利", "小过": "客队有利", "既济": "主队有利", "未济": "客队有利"
 }
-def get_gua_ji_xiong(gua):
-    return GUA_JI_XIONG.get(gua, "中，常规卦象")
 
+# ---------- 1.5 五行生克函数（返回权重）----------
 def wuxing_sheng_ke(wo, ta):
-    sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
-    ke = {"金":"木","木":"土","土":"水","水":"火","火":"金"}
-    if wo == ta: return 0.0
-    elif sheng[wo] == ta: return -0.15
-    elif ke[wo] == ta: return 0.25
-    elif sheng[ta] == wo: return -0.20
-    elif ke[ta] == wo: return 0.30
-    else: return 0.0
+    """
+    五行生克关系
+    wo: 体卦五行, ta: 用卦五行
+    返回值: 正=主队有利, 负=客队有利, 0=平衡
+    """
+    sheng = {"金": "水", "水": "木", "木": "火", "火": "土", "土": "金"}
+    ke = {"金": "木", "木": "土", "土": "水", "水": "火", "火": "金"}
+    if wo == ta:
+        return 0.0
+    elif sheng[wo] == ta:   # 体生用 → 主队耗损，客队有利
+        return -0.2
+    elif ke[wo] == ta:      # 体克用 → 主队有利
+        return 0.3
+    elif sheng[ta] == wo:   # 用生体 → 主队有利
+        return 0.25
+    elif ke[ta] == wo:      # 用克体 → 客队有利
+        return -0.3
+    else:
+        return 0.0# -*- coding: utf-8 -*-
+"""
+六爻足球预测（完整版）—— 第二部分：逻辑层
+包含：队名哈希取卦、时间定动爻、变卦生成、体用判定、胜平负综合决策
+"""
 
-# ============================================================
-# 5. 起卦函数（只依赖日期）
-# ============================================================
-def get_team_seed(team, league, date_str):
-    # 只取日期部分（前5个字符，如 "07-06"）
-    date_only = date_str[:5] if len(date_str) >= 5 else date_str
-    raw = f"{team}_{league}_{date_only}"
-    return int(hashlib.md5(raw.encode()).hexdigest(), 16) % 1000000
+import datetime
 
-def auto_gua(team1, team2, league, date_str):
-    seed = get_team_seed(team1, league, date_str) + get_team_seed(team2, league, date_str)
-    zhu = GUA_LIST[seed % 64]
-    bian = GUA_LIST[(seed // 64) % 64]
-    dong = ["初爻","二爻","三爻","四爻","五爻","上爻"][seed % 6]
-    return zhu, bian, dong
+# 从第一段导入数据（实际合并时可直接保留所有定义，此处仅为逻辑划分）
+# 假设第一段所有变量和函数已定义
 
-# ============================================================
-# 6. 核心预测函数（修正版：移除自动保级/无欲标签）
-# ============================================================
-def predict_match(league, date_time, home, away):
-    league_key = league.strip()
-    avg = LEAGUE_AVG_TOTAL.get(league_key, 2.5)
-    home_str = get_strength(home)
-    away_str = get_strength(away)
-    diff = home_str - away_str
+def get_unicode_sum(text):
+    """
+    取队名前两个字符的Unicode码点之和（若不足两字则补0）
+    """
+    if not text:
+        return 0
+    chars = list(text.strip())[:2]
+    total = 0
+    for ch in chars:
+        total += ord(ch)
+    return total
 
-    # ---- 自动识别修正标签（因缺乏排名信息，暂时全部注释） ----
-    extra = []
-    # 以下标签依赖排名数据，未提供时禁用，避免过度修正
-    # if home_str <= 2 and "05" in date_time: extra.append("保级")
-    # if away_str <= 2 and "05" in date_time: extra.append("保级客场")
-    # if home_str >= 4 and "05" in date_time: extra.append("无欲")
-    # if away_str >= 5 and "05" in date_time: extra.append("无欲")
-    if "季后赛" in league_key: extra.append("季后赛")
-    if "淘汰赛" in league_key: extra.append("淘汰赛")
-    # 若需要手动添加战意，可在此处根据用户输入扩展
+def build_ben_gua(shang_num, xia_num):
+    """
+    根据上下卦数字（1~8）返回本卦名
+    """
+    shang = NUM_TO_GUA[shang_num]
+    xia = NUM_TO_GUA[xia_num]
+    return GUA_MAP.get((shang, xia), "未知")
 
-    # ---- 起卦 ----
-    zhu, bian, dong = auto_gua(home, away, league_key, date_time)
-    gua_ji = get_gua_ji_xiong(zhu)
-    wuxing = wuxing_sheng_ke(
-        GUA_LEI_XIANG.get(zhu, {"五行":"土"})["五行"],
-        GUA_LEI_XIANG.get(bian, {"五行":"土"})["五行"]
+def get_ben_gua_from_names(home, away):
+    """
+    根据主客队名直接算出本卦（不包含动爻）
+    """
+    shang_num = get_unicode_sum(home) % 8
+    xia_num = get_unicode_sum(away) % 8
+    if shang_num == 0: shang_num = 8
+    if xia_num == 0: xia_num = 8
+    shang = NUM_TO_GUA[shang_num]
+    xia = NUM_TO_GUA[xia_num]
+    ben = GUA_MAP.get((shang, xia), "未知")
+    return ben, shang, xia
+
+def get_dong_yao(dt):
+    """
+    根据比赛时间（datetime对象）计算动爻索引（0~5）
+    使用年+月+日+时+分 之和取模6
+    """
+    total = dt.year + dt.month + dt.day + dt.hour + dt.minute
+    return total % 6
+
+def get_zhi_gua(ben, dong):
+    """
+    根据本卦和动爻位置（0~5）生成变卦名
+    思路：将本卦拆成上下卦，根据动爻所在位置（0~2在下卦，3~5在上卦）
+    将对应爻阴阳互换，然后重新组成新上下卦数字，再查表。
+    但本卦我们只有卦名，没有六爻阴阳，所以无法真正变卦。
+    因此采用简化方法：若动爻在下卦（0~2），则下卦变为其错卦；若在上卦（3~5），则上卦变为错卦。
+    错卦：乾↔坤，兑↔艮，离↔坎，震↔巽（即八卦的对冲）
+    """
+    # 八卦错卦映射
+    CUO = {
+        "乾": "坤", "坤": "乾",
+        "兑": "艮", "艮": "兑",
+        "离": "坎", "坎": "离",
+        "震": "巽", "巽": "震"
+    }
+    # 为了得到本卦的上下卦，我们需要从GUA_MAP反查，因为映射是双向的，我们建立反向字典
+    # 由于调用频繁，我们可以在外层构建，此处为了独立，临时构建
+    rev_map = {v: k for k, v in GUA_MAP.items()}
+    if ben not in rev_map:
+        return ben  # 无法反查则不变
+    shang, xia = rev_map[ben]
+    if dong < 3:  # 动在下卦
+        new_xia = CUO.get(xia, xia)
+        new_shang = shang
+    else:         # 动在上卦
+        new_shang = CUO.get(shang, shang)
+        new_xia = xia
+    return GUA_MAP.get((new_shang, new_xia), ben)
+
+def get_ti_yong(ben, dong):
+    """
+    根据动爻位置判定体卦和用卦
+    动爻在初、二、三爻（索引0,1,2）→ 用卦在下，体卦在上
+    动爻在四、五、上爻（索引3,4,5）→ 用卦在上，体卦在下
+    返回 (体卦, 用卦)
+    """
+    rev_map = {v: k for k, v in GUA_MAP.items()}
+    if ben not in rev_map:
+        return "乾", "坤"  # 默认
+    shang, xia = rev_map[ben]
+    if dong < 3:
+        return shang, xia   # 体为上，用为下
+    else:
+        return xia, shang   # 体为下，用为上
+
+def predict_football(home, away, dt):
+    """
+    核心预测函数
+    输入：主队名、客队名、比赛时间（datetime）
+    返回：预测结果（"主胜"/"平局"/"客胜"）以及卦象信息字典
+    """
+    # 1. 计算本卦及上下卦
+    shang_num = get_unicode_sum(home) % 8
+    xia_num = get_unicode_sum(away) % 8
+    if shang_num == 0: shang_num = 8
+    if xia_num == 0: xia_num = 8
+    shang = NUM_TO_GUA[shang_num]
+    xia = NUM_TO_GUA[xia_num]
+    ben = GUA_MAP.get((shang, xia), "未知")
+
+    # 2. 动爻
+    dong = get_dong_yao(dt)
+
+    # 3. 变卦（简化，仅用于展示）
+    zhi = get_zhi_gua(ben, dong)
+
+    # 4. 体用判定
+    ti, yong = get_ti_yong(ben, dong)
+
+    # 5. 卦象吉凶倾向（基准）
+    ji = GUA_JI_XIONG.get(ben, "平局倾向")
+
+    # 6. 体用五行生克
+    ti_w = GUA_WUXING.get(ti, "土")
+    yong_w = GUA_WUXING.get(yong, "土")
+    shengke = wuxing_sheng_ke(ti_w, yong_w)
+
+    # 7. 综合决策
+    # 基础倾向转数值：主胜=1，平=0，客胜=-1
+    if "主队有利" in ji:
+        base = 1
+    elif "客队有利" in ji:
+        base = -1
+    else:
+        base = 0
+
+    # 五行生克调整
+    if shengke > 0.1:
+        adjust = 1
+    elif shengke < -0.1:
+        adjust = -1
+    else:
+        adjust = 0
+
+    # 如果基础倾向为平，则直接用调整
+    if base == 0:
+        result = adjust
+    else:
+        # 若基础与调整方向一致，则强化；若相反，则保守取平
+        if base == adjust or adjust == 0:
+            result = base
+        else:
+            result = 0
+
+    # 最终方向
+    if result > 0:
+        final = "主胜"
+    elif result < 0:
+        final = "客胜"
+    else:
+        final = "平局"
+
+    # 8. 组装返回信息
+    info = {
+        "本卦": ben,
+        "变卦": zhi,
+        "动爻": f"第{dong+1}爻",
+        "体卦": ti,
+        "用卦": yong,
+        "体五行": ti_w,
+        "用五行": yong_w,
+        "体用关系": "生" if shengke > 0.1 else ("克" if shengke < -0.1 else "比和"),
+        "卦象吉凶": ji,
+        "五行权重": shengke
+    }
+    return final, info# -*- coding: utf-8 -*-
+"""
+六爻足球预测（完整版）—— 第三部分：界面层
+基于 Streamlit 的交互界面，输入框无占位文字，仅输出胜平负及卦象详情
+"""
+
+import streamlit as st
+import datetime
+
+# 从第二段导入预测函数（实际合并时直接使用）
+# 假设第二段所有函数已定义
+
+def main():
+    st.set_page_config(page_title="六爻足球预测", layout="centered")
+    st.title("⚽ 六爻 · 足球胜平负预测")
+    st.markdown("基于主客队名前两字 + 比赛时间起卦，纯卦象推演")
+
+    # 输入区域（无示范文字）
+    col1, col2 = st.columns(2)
+    with col1:
+        home = st.text_input("主队名称", value="")
+    with col2:
+        away = st.text_input("客队名称", value="")
+
+    # 时间选择器
+    dt = st.datetime_input(
+        "比赛时间",
+        value=datetime.datetime.now(),
+        format="YYYY-MM-DD HH:mm"
     )
 
-    # ---- 期望进球（应用 V9.3.1 ~ V9.3.7 全量修正） ----
-    exp = avg
-    exp += diff * 0.18
-    if zhu in ["乾","离","大壮","大有","同人"]: exp += 0.6
-    elif zhu in ["坎","艮","明夷","蹇","困"]: exp -= 0.5
-    elif zhu in ["泰","否","咸","恒","损","益","既济","未济"]: exp -= 0.2
-    exp += wuxing * 0.2
-
-    if league_key == "荷甲": exp *= 1.40
-    elif league_key == "K联赛": exp *= 0.65
-    elif league_key in ["日职","J联赛"]: exp *= 0.70
-
-    if league_key in ["西甲","沙特联"] and away_str >= 4 and "客场" in str(extra):
-        exp *= 0.75
-    if league_key == "法甲" and home == "巴黎圣日耳曼": exp *= 0.85
-    if league_key in ["欧冠","欧联","欧协联"]: exp += 0.2
-    elif league_key == "解放者杯": exp -= 0.3
-    elif league_key == "亚冠乙": exp -= 0.25
-
-    if league_key in ["挪超","瑞典超"] and home_str >=4 and away_str>=4: exp -= 0.25
-    if league_key == "德甲" and away_str == 5 and home_str <=3: exp += 0.3
-    if league_key == "K联赛" and home == "全北现代": exp += 0.4
-    if league_key in ["日职","J联赛"] and home_str <=3 and away_str >=4: exp += 0.3
-    if league_key == "解放者杯" and away_str >=4: exp -= 0.2
-    if league_key == "荷甲" and home_str <=3 and "05" in date_time: exp += 0.25
-    if league_key == "沙特联" and home_str == 3: exp += 0.35
-    # 以下修正依赖保级/无欲标签，已禁用，但保留代码（可重新启用）
-    # if league_key == "西甲" and "保级" in extra and home_str <=2: exp += 0.3
-    # if league_key == "法甲" and "保级" in extra and home_str <=3: exp += 0.3
-    if league_key == "澳超" and "季后赛" in extra: exp += 0.5
-    # if "无欲" in extra and away_str == 5: exp -= 0.3
-    # if league_key == "法甲" and "无欲" in extra and home_str >=4: exp -= 0.35
-    # if league_key == "西甲" and "保级客场" in extra and away_str <=2: exp += 0.15
-    if league_key in ["亚冠","亚冠乙"] and "淘汰赛" in extra: exp -= 0.25
-    if league_key == "芬超" and "05" in date_time: exp += 0.4
-    # if league_key == "意甲" and "无欲" in extra and home_str >=4: exp -= 0.35
-
-    exp = max(exp, 1.0)
-
-    # ---- 确定性比分离散化（枚举排序） ----
-    total = exp
-    home_ratio = 0.5 + diff * 0.05
-    home_ratio = max(0.3, min(0.7, home_ratio))
-    home_exp = total * home_ratio
-    away_exp = total * (1 - home_ratio)
-
-    candidates = []
-    for h in range(6):
-        for a in range(6):
-            if h + a == 0: continue
-            diff_score = abs(h - home_exp) + abs(a - away_exp)
-            candidates.append((diff_score, h, a))
-    candidates.sort(key=lambda x: x[0])
-    unique = []
-    for _, h, a in candidates:
-        if (h,a) not in unique:
-            unique.append((h,a))
-        if len(unique) >= 4: break
-    if len(unique) < 4:
-        common = [(1,1),(2,1),(1,0),(0,1),(2,0),(0,2)]
-        for s in common:
-            if s not in unique:
-                unique.append(s)
-            if len(unique) >= 4: break
-    best = unique[:4]
-    first_score = best[0]
-    second_score = best[1] if len(best) > 1 else first_score
-
-    # ---- 方向判定 ----
-    def res(h,a):
-        if h>a: return "主胜"
-        elif h<a: return "客胜"
-        else: return "平局"
-    first_res = res(first_score[0], first_score[1])
-    second_res = res(second_score[0], second_score[1])
-    if first_res == second_res and len(best)>1:
-        if len(best)>2:
-            second_score = best[2]
-            second_res = res(second_score[0], second_score[1])
-        else:
-            second_res = "平局" if first_res != "平局" else "客胜"
-
-    # ---- 置信度 ----
-    if "大吉" in gua_ji or "吉" in gua_ji: gua_score = 0.9
-    elif "凶" in gua_ji: gua_score = 0.5
-    else: gua_score = 0.7
-
-    if (first_res=="主胜" and diff>0) or (first_res=="客胜" and diff<0) or (first_res=="平局" and abs(diff)<=0.5):
-        str_score = 0.9
-    else: str_score = 0.5
-
-    wuxing_score = 0.8 if wuxing>0 else (0.5 if wuxing<0 else 0.6)
-    conf = int((gua_score*0.4 + str_score*0.35 + wuxing_score*0.25)*100)
-
-    if home_str==5 and away_str<=2 and first_res=="主胜" and first_score[0]-first_score[1]>=2:
-        conf = min(conf, 75)
-    if league_key == "美职联": conf = min(conf, 45)
-
-    # ---- 方向强制修正（保底规则） ----
-    if league_key=="英超" and home_str<=2 and away_str>=4:
-        if first_res != "平局" and second_res != "平局": second_res = "平局"
-    if away_str==5 and first_res!="平局" and second_res!="平局": second_res = "平局"
-    if league_key=="意甲" and home_str >= away_str+2 and first_res!="平局":
-        if second_res!="平局": second_res = "平局"
-    if league_key=="西甲" and home=="马德里竞技" and away_str<=4:
-        if first_res=="主胜" and conf>55:
-            conf -= 5
-            second_res = "平局"
-    if league_key=="德甲" and home_str<=3 and away_str>=4:
-        if first_res=="客胜":
-            first_res = "平局"
-            second_res = "主胜"
-    if league_key=="西甲" and "保级客场" in extra and away_str<=2:
-        if first_res=="主胜":
-            first_res = "平局"
-            second_res = "客胜"
-
-    return first_res, second_res, first_score, conf, zhu, bian, gua_ji
-
-# ============================================================
-# 7. Streamlit 界面
-# ============================================================
-def main():
-    st.markdown("""
-    **输入格式**：每行 `联赛，日期时间，主队 vs 客队`  
-    **注意**：起卦只使用日期部分（如 `07-06`），时间分钟不影响结果。  
-    示例：`挪甲，07-05 00:00，奥德 vs 海于格松`
-    """)
-    user_input = st.text_area("📝 粘贴比赛列表", height=300)
-    if st.button("🚀 预测"):
-        if not user_input.strip():
-            st.warning("请输入至少一场比赛")
+    if st.button("🔮 预测"):
+        # 输入校验
+        if not home.strip() or not away.strip():
+            st.warning("请完整输入主队和客队名称")
             return
-        lines = user_input.strip().split('\n')
-        for line in lines:
-            if not line.strip(): continue
-            parts = line.split('，')
-            if len(parts)<3:
-                st.error(f"格式错误：{line}")
-                continue
-            league, date_time, teams = parts[0].strip(), parts[1].strip(), parts[2].strip()
-            if ' vs ' not in teams:
-                st.error(f"缺少 vs 分隔：{line}")
-                continue
-            home, away = teams.split(' vs ')
-            first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away)
-            st.markdown(f"**{league} {date_time} {home} vs {away}**")
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("首推方向", first)
-            col2.metric("次推方向", second)
-            col3.metric("预测比分", f"{score[0]}-{score[1]}")
-            col4.metric("置信度", f"{conf}%")
-            st.caption(f"卦象：{zhu}→{bian}，{gua}")
-            st.divider()
+        if home.strip() == away.strip():
+            st.warning("主队和客队不能相同")
+            return
+
+        # 执行预测
+        result, info = predict_football(home.strip(), away.strip(), dt)
+
+        # 显示结果
+        st.subheader("预测结果")
+        if result == "主胜":
+            st.success(f"🏆 {home} 胜")
+        elif result == "客胜":
+            st.success(f"🏆 {away} 胜")
+        else:
+            st.warning("🤝 平局")
+
+        # 卦象详情（可折叠展开）
+        with st.expander("📊 查看卦象详情"):
+            col_a, col_b = st.columns(2)
+            col_a.metric("本卦", info["本卦"])
+            col_b.metric("变卦", info["变卦"])
+            st.write(f"**动爻**：{info['动爻']}")
+            st.write(f"**体卦**：{info['体卦']}（{info['体五行']}）  **用卦**：{info['用卦']}（{info['用五行']}）")
+            st.write(f"**体用关系**：{info['体用关系']}")
+            st.write(f"**卦象吉凶**：{info['卦象吉凶']}")
+            st.caption(f"五行权重系数：{info['五行权重']:.2f}")
 
 if __name__ == "__main__":
     main()
+        
