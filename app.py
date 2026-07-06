@@ -6,9 +6,9 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（最终版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（最终版）")
-st.caption("所有球队档位已补全 | 起卦只依赖日期 | 结果可复现")
+st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（修正版）", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（修正版）")
+st.caption("已注释自动保级/无欲标签，避免过度平局修正 | 起卦只依赖日期")
 
 # ============================================================
 # 2. 联赛基准进球（完整版）
@@ -33,7 +33,7 @@ LEAGUE_AVG_TOTAL = {
 }
 
 # ============================================================
-# 3. 球队实力分层（已补全所有表格涉及球队）
+# 3. 球队实力分层（完整版）
 # ============================================================
 TEAM_STRENGTH = {
     "巴西":5, "阿根廷":5, "法国":5, "英格兰":5, "西班牙":5,
@@ -91,14 +91,14 @@ TEAM_STRENGTH = {
     "名古屋鲸":2, "浦和红钻":2, "鹿岛鹿角":2, "金泉尚武":2,
     "基多大学":2,
     # ---------- 新增补全 ----------
-    "尤文图德": 2,          # 巴西乙弱队
-    "埃尔夫斯堡": 3,        # 瑞典超中游
-    "哈马比": 3,            # 瑞典超中游
-    "海于格松": 3,          # 挪甲中游
-    "奥德": 3,              # 挪甲中游
-    "MP米克": 3,            # 芬甲中游
-    "哈卡": 3,              # 芬甲中游
-    "累西腓航海": 2,        # 巴西乙弱队
+    "尤文图德": 2,
+    "埃尔夫斯堡": 3,
+    "哈马比": 3,
+    "海于格松": 3,
+    "奥德": 3,
+    "MP米克": 3,
+    "哈卡": 3,
+    "累西腓航海": 2,
 }
 
 def get_strength(team):
@@ -106,7 +106,7 @@ def get_strength(team):
     return TEAM_STRENGTH.get(clean, TEAM_STRENGTH.get(team, 3))
 
 # ============================================================
-# 4. 卦象数据库（完整版）
+# 4. 卦象数据库
 # ============================================================
 GUA_LIST = [
     "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
@@ -155,7 +155,7 @@ def wuxing_sheng_ke(wo, ta):
     else: return 0.0
 
 # ============================================================
-# 5. 起卦函数（只依赖日期，忽略时间）
+# 5. 起卦函数（只依赖日期）
 # ============================================================
 def get_team_seed(team, league, date_str):
     # 只取日期部分（前5个字符，如 "07-06"）
@@ -171,7 +171,7 @@ def auto_gua(team1, team2, league, date_str):
     return zhu, bian, dong
 
 # ============================================================
-# 6. 核心预测函数（V9.3.7 全量修正）
+# 6. 核心预测函数（修正版：移除自动保级/无欲标签）
 # ============================================================
 def predict_match(league, date_time, home, away):
     league_key = league.strip()
@@ -180,14 +180,16 @@ def predict_match(league, date_time, home, away):
     away_str = get_strength(away)
     diff = home_str - away_str
 
-    # ---- 自动识别修正标签 ----
+    # ---- 自动识别修正标签（因缺乏排名信息，暂时全部注释） ----
     extra = []
-    if home_str <= 2 and "05" in date_time: extra.append("保级")
-    if away_str <= 2 and "05" in date_time: extra.append("保级客场")
-    if home_str >= 4 and "05" in date_time: extra.append("无欲")
-    if away_str >= 5 and "05" in date_time: extra.append("无欲")
+    # 以下标签依赖排名数据，未提供时禁用，避免过度修正
+    # if home_str <= 2 and "05" in date_time: extra.append("保级")
+    # if away_str <= 2 and "05" in date_time: extra.append("保级客场")
+    # if home_str >= 4 and "05" in date_time: extra.append("无欲")
+    # if away_str >= 5 and "05" in date_time: extra.append("无欲")
     if "季后赛" in league_key: extra.append("季后赛")
     if "淘汰赛" in league_key: extra.append("淘汰赛")
+    # 若需要手动添加战意，可在此处根据用户输入扩展
 
     # ---- 起卦 ----
     zhu, bian, dong = auto_gua(home, away, league_key, date_time)
@@ -223,15 +225,16 @@ def predict_match(league, date_time, home, away):
     if league_key == "解放者杯" and away_str >=4: exp -= 0.2
     if league_key == "荷甲" and home_str <=3 and "05" in date_time: exp += 0.25
     if league_key == "沙特联" and home_str == 3: exp += 0.35
-    if league_key == "西甲" and "保级" in extra and home_str <=2: exp += 0.3
-    if league_key == "法甲" and "保级" in extra and home_str <=3: exp += 0.3
+    # 以下修正依赖保级/无欲标签，已禁用，但保留代码（可重新启用）
+    # if league_key == "西甲" and "保级" in extra and home_str <=2: exp += 0.3
+    # if league_key == "法甲" and "保级" in extra and home_str <=3: exp += 0.3
     if league_key == "澳超" and "季后赛" in extra: exp += 0.5
-    if "无欲" in extra and away_str == 5: exp -= 0.3
-    if league_key == "法甲" and "无欲" in extra and home_str >=4: exp -= 0.35
-    if league_key == "西甲" and "保级客场" in extra and away_str <=2: exp += 0.15
+    # if "无欲" in extra and away_str == 5: exp -= 0.3
+    # if league_key == "法甲" and "无欲" in extra and home_str >=4: exp -= 0.35
+    # if league_key == "西甲" and "保级客场" in extra and away_str <=2: exp += 0.15
     if league_key in ["亚冠","亚冠乙"] and "淘汰赛" in extra: exp -= 0.25
     if league_key == "芬超" and "05" in date_time: exp += 0.4
-    if league_key == "意甲" and "无欲" in extra and home_str >=4: exp -= 0.35
+    # if league_key == "意甲" and "无欲" in extra and home_str >=4: exp -= 0.35
 
     exp = max(exp, 1.0)
 
