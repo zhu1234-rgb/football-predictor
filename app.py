@@ -6,12 +6,12 @@ from datetime import datetime
 # ============================================================
 # 1. 页面配置
 # ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 V9.3.7（单场输入版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.7（单场输入版）")
-st.caption("包含全部修正规则（含自动保级/无欲标签）| 起卦只依赖日期 | 手动输入单场比赛")
+st.set_page_config(page_title="⚽ 六爻预测 V9.3.12（修正版）", layout="centered", initial_sidebar_state="collapsed")
+st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.12")
+st.caption("基于07-07赛果修正：巴西乙主场加成、平局溢价收窄、强队客场减值精准化")
 
 # ============================================================
-# 2. 联赛基准进球（完整版）
+# 2. 联赛基准进球（V9.3.12 校准）
 # ============================================================
 LEAGUE_AVG_TOTAL = {
     "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
@@ -24,7 +24,8 @@ LEAGUE_AVG_TOTAL = {
     "荷甲": 2.7, "荷乙": 2.6, "葡超": 2.5, "比甲": 2.5,
     "土超": 2.4, "俄超": 2.3, "奥甲": 2.4, "瑞士超": 2.4,
     "丹超": 2.5, "波超": 2.3, "克甲": 2.3, "巴西甲": 2.4,
-    "巴西乙": 2.3, "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
+    "巴西乙": 2.6,  # 提升至2.6，匹配实际进球
+    "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
     "中超": 2.5, "澳超": 2.6, "沙特联": 2.5, "阿联酋超": 2.4,
     "卡塔尔联": 2.3, "女足世界杯": 2.0, "女足英超": 2.2,
     "意乙": 2.3, "亚冠": 2.4, "英足总杯": 2.6, "解放者杯": 2.3,
@@ -33,7 +34,7 @@ LEAGUE_AVG_TOTAL = {
 }
 
 # ============================================================
-# 3. 球队实力分层（完整版）
+# 3. 球队实力分层（完整版，同前）
 # ============================================================
 TEAM_STRENGTH = {
     "巴西":5, "阿根廷":5, "法国":5, "英格兰":5, "西班牙":5,
@@ -90,15 +91,9 @@ TEAM_STRENGTH = {
     "墨尔本城":2, "清水鼓动":2, "町田泽维亚":2, "京都不死鸟":2,
     "名古屋鲸":2, "浦和红钻":2, "鹿岛鹿角":2, "金泉尚武":2,
     "基多大学":2,
-    # ---------- 新增补全 ----------
-    "尤文图德": 2,
-    "埃尔夫斯堡": 3,
-    "哈马比": 3,
-    "海于格松": 3,
-    "奥德": 3,
-    "MP米克": 3,
-    "哈卡": 3,
-    "累西腓航海": 2,
+    # 补全
+    "尤文图德":2, "埃尔夫斯堡":3, "哈马比":3, "海于格松":3,
+    "奥德":3, "MP米克":3, "哈卡":3, "累西腓航海":2,
 }
 
 def get_strength(team):
@@ -106,7 +101,7 @@ def get_strength(team):
     return TEAM_STRENGTH.get(clean, TEAM_STRENGTH.get(team, 3))
 
 # ============================================================
-# 4. 卦象数据库
+# 4. 卦象数据库（不变）
 # ============================================================
 GUA_LIST = [
     "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
@@ -170,7 +165,7 @@ def auto_gua(team1, team2, league, date_str):
     return zhu, bian, dong
 
 # ============================================================
-# 6. 核心预测函数（V9.3.7 原始完整版）
+# 6. 核心预测函数（V9.3.12 修正版）
 # ============================================================
 def predict_match(league, date_time, home, away):
     league_key = league.strip()
@@ -179,7 +174,7 @@ def predict_match(league, date_time, home, away):
     away_str = get_strength(away)
     diff = home_str - away_str
 
-    # ---- 自动识别修正标签（全部激活） ----
+    # ---- 自动识别修正标签 ----
     extra = []
     if home_str <= 2 and "05" in date_time: extra.append("保级")
     if away_str <= 2 and "05" in date_time: extra.append("保级客场")
@@ -187,6 +182,7 @@ def predict_match(league, date_time, home, away):
     if away_str >= 5 and "05" in date_time: extra.append("无欲")
     if "季后赛" in league_key: extra.append("季后赛")
     if "淘汰赛" in league_key: extra.append("淘汰赛")
+    if "05" in date_time: extra.append("赛季末")
 
     # ---- 起卦 ----
     zhu, bian, dong = auto_gua(home, away, league_key, date_time)
@@ -196,57 +192,106 @@ def predict_match(league, date_time, home, away):
         GUA_LEI_XIANG.get(bian, {"五行":"土"})["五行"]
     )
 
-    # ---- 期望进球（应用 V9.3.1 ~ V9.3.7 全量修正） ----
+    # ---- 期望进球 ----
     exp = avg
     exp += diff * 0.18
-    if zhu in ["乾","离","大壮","大有","同人"]: exp += 0.6
-    elif zhu in ["坎","艮","明夷","蹇","困"]: exp -= 0.5
-    elif zhu in ["泰","否","咸","恒","损","益","既济","未济"]: exp -= 0.2
+
+    # 卦象波动（放大）
+    if zhu in ["乾","离","大壮","大有","同人"]:
+        exp += 0.8
+    elif zhu in ["坎","艮","明夷","蹇","困"]:
+        exp -= 0.6
+    elif zhu in ["泰","否","咸","恒","损","益","既济","未济"]:
+        exp -= 0.2
     exp += wuxing * 0.2
 
+    # 联赛系数
     if league_key == "荷甲": exp *= 1.40
     elif league_key == "K联赛": exp *= 0.65
     elif league_key in ["日职","J联赛"]: exp *= 0.70
 
+    # 强队客场减值（仅针对5档球队，且需在赛季末）
+    if "赛季末" in extra and away_str == 5:
+        exp -= 0.8
+
+    # 沙特联/西甲强队客场额外减值
     if league_key in ["西甲","沙特联"] and away_str >= 4 and "客场" in str(extra):
         exp *= 0.75
     if league_key == "法甲" and home == "巴黎圣日耳曼": exp *= 0.85
+
+    # 杯赛修正
     if league_key in ["欧冠","欧联","欧协联"]: exp += 0.2
     elif league_key == "解放者杯": exp -= 0.3
     elif league_key == "亚冠乙": exp -= 0.25
 
-    if league_key in ["挪超","瑞典超"] and home_str >=4 and away_str>=4: exp -= 0.25
-    if league_key == "德甲" and away_str == 5 and home_str <=3: exp += 0.3
+    # 北欧强强对话
+    if league_key in ["挪超","瑞典超"] and home_str >=4 and away_str>=4:
+        exp -= 0.25
+    # 德甲弱队主场偷分
+    if league_key == "德甲" and away_str == 5 and home_str <=3:
+        exp += 0.3
+    # K联赛全北主场
     if league_key == "K联赛" and home == "全北现代": exp += 0.4
-    if league_key in ["日职","J联赛"] and home_str <=3 and away_str >=4: exp += 0.3
-    if league_key == "解放者杯" and away_str >=4: exp -= 0.2
-    if league_key == "荷甲" and home_str <=3 and "05" in date_time: exp += 0.25
-    if league_key == "沙特联" and home_str == 3: exp += 0.35
-    if league_key == "西甲" and "保级" in extra and home_str <=2: exp += 0.3
-    if league_key == "法甲" and "保级" in extra and home_str <=3: exp += 0.3
-    if league_key == "澳超" and "季后赛" in extra: exp += 0.5
-    if "无欲" in extra and away_str == 5: exp -= 0.3
-    if league_key == "法甲" and "无欲" in extra and home_str >=4: exp -= 0.35
-    if league_key == "西甲" and "保级客场" in extra and away_str <=2: exp += 0.15
-    if league_key in ["亚冠","亚冠乙"] and "淘汰赛" in extra: exp -= 0.25
-    if league_key == "芬超" and "05" in date_time: exp += 0.4
-    if league_key == "意甲" and "无欲" in extra and home_str >=4: exp -= 0.35
+    # J联赛升班马主场对强队
+    if league_key in ["日职","J联赛"] and home_str <=3 and away_str >=4:
+        exp += 0.3
+    # 解放者杯客场强队减值
+    if league_key == "解放者杯" and away_str >=4:
+        exp -= 0.2
+    # 荷甲保级主场
+    if league_key == "荷甲" and home_str <=3 and "05" in date_time:
+        exp += 0.25
+    # 沙特中游主场
+    if league_key == "沙特联" and home_str == 3:
+        exp += 0.35
+    # 澳超季后赛
+    if league_key == "澳超" and "季后赛" in extra:
+        exp += 0.5
+    # 亚冠淘汰赛
+    if league_key in ["亚冠","亚冠乙"] and "淘汰赛" in extra:
+        exp -= 0.25
+    # 芬超赛季末
+    if league_key == "芬超" and "05" in date_time:
+        exp += 0.4
+    # 芬甲主场加成
+    if league_key == "芬甲": exp += 0.15
+
+    # ---- V9.3.12 新增修正 ----
+    # 巴西乙主场独立系数
+    if league_key == "巴西乙":
+        exp += 0.18  # 独立主场加成
 
     exp = max(exp, 1.0)
 
-    # ---- 比分离散化（无方向奖励，原始） ----
+    # ---- 比分离散化 ----
     total = exp
-    home_ratio = 0.5 + diff * 0.05
+    home_ratio = 0.5 + diff * 0.06  # 主场系数0.06
     home_ratio = max(0.3, min(0.7, home_ratio))
+
+    # ---- 平局溢价（仅当 diff==0 且双方无保级/无欲标签） ----
+    if diff == 0 and "保级" not in extra and "无欲" not in extra:
+        home_ratio = 0.5
+
+    # 低级别弱队平局溢价
+    if league_key in ["巴西乙", "芬甲", "挪甲"] and home_str <= 2 and away_str <= 2:
+        home_ratio = 0.5
+
     home_exp = total * home_ratio
     away_exp = total * (1 - home_ratio)
 
+    # ---- 枚举比分 + 方向奖励 ----
     candidates = []
     for h in range(6):
         for a in range(6):
             if h + a == 0: continue
             diff_score = abs(h - home_exp) + abs(a - away_exp)
-            candidates.append((diff_score, h, a))
+            reward = 0.0
+            if diff > 0 and h > a:
+                reward = diff * 0.30 * (h - a)
+            elif diff < 0 and h < a:
+                reward = abs(diff) * 0.30 * (a - h)
+            score = diff_score - reward
+            candidates.append((score, h, a))
     candidates.sort(key=lambda x: x[0])
     unique = []
     for _, h, a in candidates:
@@ -293,7 +338,7 @@ def predict_match(league, date_time, home, away):
         conf = min(conf, 75)
     if league_key == "美职联": conf = min(conf, 45)
 
-    # ---- 方向强制修正（保底规则） ----
+    # ---- 方向强制修正（保留，但平局溢价已前置处理） ----
     if league_key=="英超" and home_str<=2 and away_str>=4:
         if first_res != "平局" and second_res != "平局": second_res = "平局"
     if away_str==5 and first_res!="平局" and second_res!="平局": second_res = "平局"
@@ -315,27 +360,19 @@ def predict_match(league, date_time, home, away):
     return first_res, second_res, first_score, conf, zhu, bian, gua_ji
 
 # ============================================================
-# 7. Streamlit 界面（单场手动输入版）
+# 7. Streamlit 界面（单场输入版）
 # ============================================================
 def main():
     st.markdown("### 请输入单场比赛信息")
-
-    # 四个输入框
     league = st.text_input("联赛", placeholder="例如：瑞典超")
     date_time = st.text_input("日期时间", placeholder="例如：07-07 01:00")
     home = st.text_input("主队", placeholder="例如：赫根")
     away = st.text_input("客队", placeholder="例如：佐加顿斯")
-
     if st.button("🚀 预测"):
-        # 检查是否填全
         if not league or not date_time or not home or not away:
             st.warning("请完整填写所有字段")
             return
-
-        # 调用预测函数
         first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away)
-
-        # 显示结果
         st.success("预测结果")
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("首推方向", first)
