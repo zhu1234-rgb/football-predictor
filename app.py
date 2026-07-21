@@ -1,385 +1,334 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
 import math
 import hashlib
 from datetime import datetime
+from scipy.stats import poisson
 
-# ============================================================
-# 1. 页面配置
-# ============================================================
-st.set_page_config(page_title="⚽ 六爻预测 V9.3.12（修正版）", layout="centered", initial_sidebar_state="collapsed")
-st.title("⚽ 六爻 · 纯卦象预测引擎 V9.3.12")
-st.caption("基于07-07赛果修正：巴西乙主场加成、平局溢价收窄、强队客场减值精准化")
+# ===================== 页面基础配置 =====================
+st.set_page_config(page_title="FUSIONAPP 赛事融合预测", layout="wide", initial_sidebar_state="expanded")
+st.title("⚽ FUSIONAPP 足球融合预测模型")
+st.caption("数理统计模型 + 六爻模拟铜钱卦 双引擎融合｜支持五大联赛/K1/K2/J1/J2")
 
-# ============================================================
-# 2. 联赛基准进球（V9.3.12 校准）
-# ============================================================
+
+# =========================================================
+# 模块1：数理统计模型（泊松分布）
+# =========================================================
 LEAGUE_AVG_TOTAL = {
-    "英超": 2.8, "西甲": 2.6, "德甲": 2.9, "意甲": 2.5, "法甲": 2.5,
-    "欧冠": 2.6, "欧联": 2.6, "欧协联": 2.5,
-    "日职": 2.4, "日乙": 2.3, "K联赛": 2.3, "K2联赛": 2.2,
-    "世界杯": 2.2, "亚洲杯": 2.2, "非洲杯": 2.1, "美洲杯": 2.3, "欧洲杯": 2.4,
-    "国际友谊赛": 2.8, "芬超": 2.4, "芬甲": 2.3, "挪甲": 2.4,
-    "瑞典超": 2.5, "冰岛超": 2.4, "爱超": 2.3, "爱甲": 2.2,
-    "苏超": 2.5, "英冠": 2.6, "英甲": 2.5, "英乙": 2.4,
-    "荷甲": 2.7, "荷乙": 2.6, "葡超": 2.5, "比甲": 2.5,
-    "土超": 2.4, "俄超": 2.3, "奥甲": 2.4, "瑞士超": 2.4,
-    "丹超": 2.5, "波超": 2.3, "克甲": 2.3, "巴西甲": 2.4,
-    "巴西乙": 2.6,  # 提升至2.6，匹配实际进球
-    "阿甲": 2.3, "美职联": 2.6, "墨超": 2.4,
-    "中超": 2.5, "澳超": 2.6, "沙特联": 2.5, "阿联酋超": 2.4,
-    "卡塔尔联": 2.3, "女足世界杯": 2.0, "女足英超": 2.2,
-    "意乙": 2.3, "亚冠": 2.4, "英足总杯": 2.6, "解放者杯": 2.3,
-    "亚冠乙": 2.4, "国王杯": 2.4, "荷兰杯": 2.5, "德国杯": 2.6,
-    "意大利杯": 2.4, "法国杯": 2.5, "足总杯": 2.6,
+    "英超": 2.8, "西甲": 2.6, "德甲": 2.9,
+    "意甲": 2.6, "法甲": 2.5,
+    "K1联赛": 2.3, "K2联赛": 2.2,
+    "J1联赛": 2.4, "J2联赛": 2.3,
 }
 
-# ============================================================
-# 3. 球队实力分层（完整版，同前）
-# ============================================================
-TEAM_STRENGTH = {
-    "巴西":5, "阿根廷":5, "法国":5, "英格兰":5, "西班牙":5,
-    "德国":5, "葡萄牙":5, "比利时":5, "荷兰":5, "意大利":5,
-    "拜仁慕尼黑":5, "巴黎圣日耳曼":5, "皇家马德里":5, "巴塞罗那":5,
-    "曼城":5, "利物浦":5, "阿森纳":5, "国际米兰":5,
-    "马德里竞技":5, "勒沃库森":4, "多特蒙德":4,
-    "博德闪耀":5, "本菲卡":5,
-    "尤文图斯":4, "AC米兰":4, "那不勒斯":4, "亚特兰大":4,
-    "莱比锡红牛":4, "塞维利亚":3, "毕尔巴鄂竞技":4, "比利亚雷亚尔":4,
-    "阿斯顿维拉":3, "切尔西":3, "曼联":4, "热刺":4,
-    "纽卡斯尔联":4, "西汉姆联":4, "布伦特福德":4,
-    "克罗地亚":4, "乌拉圭":4, "瑞士":4, "瑞典":4, "丹麦":4,
-    "墨西哥":4, "美国":4, "塞内加尔":4, "摩洛哥":4, "日本":4,
-    "韩国":4, "澳大利亚":4, "尼日利亚":4, "哥伦比亚":4,
-    "蔚山现代":4, "全北现代":3, "浦项制铁":4, "马尔默":3,
-    "赫尔辛基":3, "莫尔德":4, "利雅得胜利":4, "吉达国民":4,
-    "吉达联合":4, "水晶宫":4, "利雅得新月":4, "大阪钢巴":4,
-    "神户胜利船":4, "皇家社会":3, "里尔":4, "波尔图":4,
-    "里斯本竞技":4, "罗马":4, "拉齐奥":4, "佛罗伦萨":4,
-    "科林蒂安":4, "帕尔梅拉斯":4, "弗拉门戈":4, "弗鲁米嫩塞":4,
-    "博卡青年":4, "河床":4, "弗赖堡":4, "布拉加":4,
-    "诺丁汉森林":4, "雅典AEK":4, "斯特拉斯":3, "霍芬海姆":4,
-    "奥格斯堡":4, "洛里昂":4, "伯恩茅斯":4, "里昂":4,
-    "布兰":4, "拉斯决心":4, "新未来城":3, "通德拉":3,
-    "伊普斯":3, "浦和红钻":3, "仁川联":4, "江原FC":4,
-    "福冈黄蜂":4, "天狼星":4, "赫塔费":4, "尼斯":4,
-    "布赖合作":4, "艾禾斯堡":3, "勒芒":3, "阿尔梅勒":3,
-    "圣保利":3, "克莱蒙":3, "阿维SAD":3, "夏洛特FC":3,
-    "圣何塞地震":3, "安养FC":3, "利勒斯特":3, "麦克阿瑟":3,
-    "芬洛":3, "不伦瑞克":3, "阿拉维斯":3, "埃尔切":3,
-    "莱万特":3, "科莫":3, "敦刻尔克":3, "海登海姆":4,
-    "厄瓜多尔":3, "巴拉圭":3, "智利":3, "秘鲁":3, "土耳其":3,
-    "奥地利":3, "苏格兰":3, "挪威":3, "乌克兰":3, "伊朗":3,
-    "沙特阿拉伯":3, "卡塔尔":3, "阿联酋":3, "阿尔及利亚":3,
-    "科特迪瓦":3, "加纳":3, "埃及":3, "突尼斯":3,
-    "匈牙利":3, "罗马尼亚":3, "威尔士":3, "希腊":3, "黑山":3,
-    "斯洛文尼亚":3, "塞尔维亚":3, "塞尔塔":3, "贝蒂斯":3,
-    "巴列卡诺":3, "美因茨":3, "水晶体育":3, "麦德林":3,
-    "新西兰":2, "加拿大":2, "佛得角":2, "库拉索":2,
-    "波黑":2, "斯洛伐克":2, "捷克":2, "南非":2,
-    "伊拉克":2, "约旦":2, "乌兹别克斯坦":2, "巴拿马":2,
-    "海地":2, "刚果(金)":2, "富川FC":2, "拉赫蒂":2,
-    "玛丽港":2, "哈卡":2, "桑德兰":2, "利兹联":2,
-    "伯恩利":2, "沃特福德":2, "莱万特":2, "西班牙人":2,
-    "马略卡":2, "阿拉维斯":2, "加的斯":2, "奥维耶多":2,
-    "科莫":2, "莱切":2, "比萨":2, "恩波利":2,
-    "赫尔城":2, "牛津联":2, "米尔沃尔":2, "朴次茅斯":2,
-    "布莱克本":2, "西布朗":2, "雷克斯汉姆":2, "斯旺西":2,
-    "伯明翰":2, "诺维奇":2, "考文垂":2, "女王巡游":2,
-    "米堡":2, "麦克阿瑟":2, "纽卡斯托":2, "阿德莱德联":2,
-    "西悉尼":2, "珀斯光荣":2, "中央海岸":2, "布里斯班":2,
-    "惠灵顿凤凰":2, "墨尔本胜利":2, "奥克兰FC":2, "悉尼FC":2,
-    "墨尔本城":2, "清水鼓动":2, "町田泽维亚":2, "京都不死鸟":2,
-    "名古屋鲸":2, "浦和红钻":2, "鹿岛鹿角":2, "金泉尚武":2,
-    "基多大学":2,
-    # 补全
-    "尤文图德":2, "埃尔夫斯堡":3, "哈马比":3, "海于格松":3,
-    "奥德":3, "MP米克":3, "哈卡":3, "累西腓航海":2,
-}
+def predict_match_stat(home_team, away_team, league="K1联赛",
+                       home_attack=1.0, away_attack=1.0,
+                       home_defense=1.0, away_defense=1.0):
+    """基于泊松分布计算胜平负概率"""
+    league_avg = LEAGUE_AVG_TOTAL.get(league, 2.5)
+    home_goals_avg = (league_avg / 2) * home_attack / away_defense
+    away_goals_avg = (league_avg / 2) * away_attack / home_defense
 
-def get_strength(team):
-    clean = team.split('(')[0].strip()
-    return TEAM_STRENGTH.get(clean, TEAM_STRENGTH.get(team, 3))
+    max_goals = 6
+    probs = {}
+    for hg in range(max_goals + 1):
+        for ag in range(max_goals + 1):
+            p = poisson.pmf(hg, home_goals_avg) * poisson.pmf(ag, away_goals_avg)
+            probs[(hg, ag)] = p
 
-# ============================================================
-# 4. 卦象数据库（不变）
-# ============================================================
-GUA_LIST = [
-    "乾","坤","屯","蒙","需","讼","师","比","小畜","履","泰","否","同人","大有","谦","豫",
-    "随","蛊","临","观","噬嗑","贲","剥","复","无妄","大畜","颐","大过","坎","离",
-    "咸","恒","遁","大壮","晋","明夷","家人","睽","蹇","解","损","益","夬","姤",
-    "萃","升","困","井","革","鼎","震","艮","渐","归妹","丰","旅","巽","兑",
-    "涣","节","中孚","小过","既济","未济"
-]
-GUA_LEI_XIANG = {
-    "乾":{"五行":"金","比赛":"冠军"}, "坤":{"五行":"土","比赛":"防守"},
-    "震":{"五行":"木","比赛":"冲击"}, "巽":{"五行":"木","比赛":"边路"},
-    "坎":{"五行":"水","比赛":"防守"}, "离":{"五行":"火","比赛":"进攻"},
-    "艮":{"五行":"土","比赛":"铁桶"}, "兑":{"五行":"金","比赛":"突破"}
-}
-GUA_JI_XIONG = {
-    "泰":"大吉，主队有利","否":"大凶，客队有利","谦":"大吉，主队有利",
-    "豫":"吉，主队有利","随":"吉，主队有利","蛊":"凶，客队有利",
-    "临":"吉，主队有利","观":"中，平局倾向","噬嗑":"中，客队有利",
-    "贲":"中，主队有利","剥":"凶，客队有利","复":"吉，主队有利",
-    "无妄":"吉，主队有利","大畜":"吉，主队有利","颐":"中，平局倾向",
-    "大过":"凶，客队有利","坎":"凶，客队有利","离":"中，主队有利",
-    "咸":"吉，主队有利","恒":"中，平局倾向","遁":"凶，客队有利",
-    "大壮":"吉，主队有利","晋":"吉，主队有利","明夷":"凶，客队有利",
-    "家人":"吉，主队有利","睽":"凶，客队有利","蹇":"凶，客队有利",
-    "解":"吉，主队有利","损":"凶，客队有利","益":"吉，主队有利",
-    "夬":"中，主队有利","姤":"中，平局倾向","萃":"吉，主队有利",
-    "升":"吉，主队有利","困":"凶，客队有利","井":"中，平局倾向",
-    "革":"中，客队有利","鼎":"吉，主队有利","震":"中，平局倾向",
-    "艮":"中，平局倾向","渐":"吉，主队有利","归妹":"中，客队有利",
-    "丰":"吉，主队有利","旅":"凶，客队有利","巽":"中，平局倾向",
-    "兑":"吉，主队有利","涣":"凶，客队有利","节":"中，平局倾向",
-    "中孚":"吉，主队有利","小过":"中，客队有利","既济":"吉，主队有利",
-    "未济":"凶，客队有利","乾":"大吉，主队有利","坤":"中，平局倾向",
-}
-def get_gua_ji_xiong(gua):
-    return GUA_JI_XIONG.get(gua, "中，常规卦象")
+    home_win = sum(p for (h, a), p in probs.items() if h > a)
+    draw = sum(p for (h, a), p in probs.items() if h == a)
+    away_win = sum(p for (h, a), p in probs.items() if h < a)
 
-def wuxing_sheng_ke(wo, ta):
-    sheng = {"金":"水","水":"木","木":"火","火":"土","土":"金"}
-    ke = {"金":"木","木":"土","土":"水","水":"火","火":"金"}
-    if wo == ta: return 0.0
-    elif sheng[wo] == ta: return -0.15
-    elif ke[wo] == ta: return 0.25
-    elif sheng[ta] == wo: return -0.20
-    elif ke[ta] == wo: return 0.30
-    else: return 0.0
+    total = home_win + draw + away_win
+    return {
+        "主胜概率": round(home_win / total, 4),
+        "平局概率": round(draw / total, 4),
+        "客胜概率": round(away_win / total, 4)
+    }
 
-# ============================================================
-# 5. 起卦函数（只依赖日期）
-# ============================================================
-def get_team_seed(team, league, date_str):
-    date_only = date_str[:5] if len(date_str) >= 5 else date_str
-    raw = f"{team}_{league}_{date_only}"
-    return int(hashlib.md5(raw.encode()).hexdigest(), 16) % 1000000
 
-def auto_gua(team1, team2, league, date_str):
-    seed = get_team_seed(team1, league, date_str) + get_team_seed(team2, league, date_str)
-    zhu = GUA_LIST[seed % 64]
-    bian = GUA_LIST[(seed // 64) % 64]
-    dong = ["初爻","二爻","三爻","四爻","五爻","上爻"][seed % 6]
-    return zhu, bian, dong
+# =========================================================
+# 模块2：六爻模拟铜钱起卦
+# =========================================================
+ZHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+ZHI_WUXING = {'寅': '木', '卯': '木', '巳': '火', '午': '火', '申': '金', '酉': '金',
+              '亥': '水', '子': '水', '辰': '土', '戌': '土', '丑': '土', '未': '土'}
 
-# ============================================================
-# 6. 核心预测函数（V9.3.12 修正版）
-# ============================================================
-def predict_match(league, date_time, home, away):
-    league_key = league.strip()
-    avg = LEAGUE_AVG_TOTAL.get(league_key, 2.5)
-    home_str = get_strength(home)
-    away_str = get_strength(away)
-    diff = home_str - away_str
+def get_liuqin(shi_zhi, target_zhi):
+    wx_order = {'木': 0, '火': 1, '土': 2, '金': 3, '水': 4}
+    s = wx_order[ZHI_WUXING[shi_zhi]]
+    t = wx_order[ZHI_WUXING[target_zhi]]
+    if s == t:
+        return '兄弟'
+    if (s + 1) % 5 == t:
+        return '子孙'
+    if (t + 1) % 5 == s:
+        return '父母'
+    if (s + 2) % 5 == t:
+        return '妻财'
+    if (t + 2) % 5 == s:
+        return '官鬼'
+    return '兄弟'
 
-    # ---- 自动识别修正标签 ----
-    extra = []
-    if home_str <= 2 and "05" in date_time: extra.append("保级")
-    if away_str <= 2 and "05" in date_time: extra.append("保级客场")
-    if home_str >= 4 and "05" in date_time: extra.append("无欲")
-    if away_str >= 5 and "05" in date_time: extra.append("无欲")
-    if "季后赛" in league_key: extra.append("季后赛")
-    if "淘汰赛" in league_key: extra.append("淘汰赛")
-    if "05" in date_time: extra.append("赛季末")
+def coin_sim_gua(home_team, away_team, kick_time_str, league="K1联赛"):
+    """模拟铜钱摇卦，返回六亲生克倾向"""
+    seed_str = f"{home_team}|{away_team}|{kick_time_str}|{league}"
+    hash_digest = hashlib.sha256(seed_str.encode('utf-8')).hexdigest()
+    hex_part = hash_digest[:12]
 
-    # ---- 起卦 ----
-    zhu, bian, dong = auto_gua(home, away, league_key, date_time)
-    gua_ji = get_gua_ji_xiong(zhu)
-    wuxing = wuxing_sheng_ke(
-        GUA_LEI_XIANG.get(zhu, {"五行":"土"})["五行"],
-        GUA_LEI_XIANG.get(bian, {"五行":"土"})["五行"]
-    )
+    yao = [1 if int(hex_part[i*2:(i+1)*2], 16) / 255.0 > 0.5 else 0 for i in range(6)]
 
-    # ---- 期望进球 ----
-    exp = avg
-    exp += diff * 0.18
+    move_idx = int(hash_digest[12], 16) % 6
+    change_yao = yao.copy()
+    change_yao[move_idx] = 1 - change_yao[move_idx]
 
-    # 卦象波动（放大）
-    if zhu in ["乾","离","大壮","大有","同人"]:
-        exp += 0.8
-    elif zhu in ["坎","艮","明夷","蹇","困"]:
-        exp -= 0.6
-    elif zhu in ["泰","否","咸","恒","损","益","既济","未济"]:
-        exp -= 0.2
-    exp += wuxing * 0.2
+    yang_pos = [i for i, v in enumerate(yao) if v == 1]
+    shi_idx = yang_pos[len(yang_pos)//2] if len(yang_pos) % 2 == 1 else 2
 
-    # 联赛系数
-    if league_key == "荷甲": exp *= 1.40
-    elif league_key == "K联赛": exp *= 0.65
-    elif league_key in ["日职","J联赛"]: exp *= 0.70
+    dt = datetime.strptime(kick_time_str.split()[0], "%m-%d")
+    day_index = (dt.day + dt.month) % 12
+    day_zhi = ZHI[day_index]
+    shi_zhi = ZHI[(ZHI.index(day_zhi) + shi_idx) % 12]
+    ying_zhi = ZHI[(ZHI.index(shi_zhi) + 4) % 12]
 
-    # 强队客场减值（仅针对5档球队，且需在赛季末）
-    if "赛季末" in extra and away_str == 5:
-        exp -= 0.8
+    shengke = get_liuqin(shi_zhi, ying_zhi)
 
-    # 沙特联/西甲强队客场额外减值
-    if league_key in ["西甲","沙特联"] and away_str >= 4 and "客场" in str(extra):
-        exp *= 0.75
-    if league_key == "法甲" and home == "巴黎圣日耳曼": exp *= 0.85
+    if shengke in ('妻财', '子孙'):
+        return {"主胜概率": 0.70, "平局概率": 0.15, "客胜概率": 0.15}
+    elif shengke in ('官鬼', '父母'):
+        return {"主胜概率": 0.15, "平局概率": 0.15, "客胜概率": 0.70}
+    else:
+        return {"主胜概率": 0.25, "平局概率": 0.50, "客胜概率": 0.25}
 
-    # 杯赛修正
-    if league_key in ["欧冠","欧联","欧协联"]: exp += 0.2
-    elif league_key == "解放者杯": exp -= 0.3
-    elif league_key == "亚冠乙": exp -= 0.25
 
-    # 北欧强强对话
-    if league_key in ["挪超","瑞典超"] and home_str >=4 and away_str>=4:
-        exp -= 0.25
-    # 德甲弱队主场偷分
-    if league_key == "德甲" and away_str == 5 and home_str <=3:
-        exp += 0.3
-    # K联赛全北主场
-    if league_key == "K联赛" and home == "全北现代": exp += 0.4
-    # J联赛升班马主场对强队
-    if league_key in ["日职","J联赛"] and home_str <=3 and away_str >=4:
-        exp += 0.3
-    # 解放者杯客场强队减值
-    if league_key == "解放者杯" and away_str >=4:
-        exp -= 0.2
-    # 荷甲保级主场
-    if league_key == "荷甲" and home_str <=3 and "05" in date_time:
-        exp += 0.25
-    # 沙特中游主场
-    if league_key == "沙特联" and home_str == 3:
-        exp += 0.35
-    # 澳超季后赛
-    if league_key == "澳超" and "季后赛" in extra:
-        exp += 0.5
-    # 亚冠淘汰赛
-    if league_key in ["亚冠","亚冠乙"] and "淘汰赛" in extra:
-        exp -= 0.25
-    # 芬超赛季末
-    if league_key == "芬超" and "05" in date_time:
-        exp += 0.4
-    # 芬甲主场加成
-    if league_key == "芬甲": exp += 0.15
+# =========================================================
+# 模块3：融合加权函数
+# =========================================================
+def fusion_calc(stat_data, gua_data, w1, w2):
+    """加权融合并归一化"""
+    home = stat_data["主胜概率"] * w1 + gua_data["主胜概率"] * w2
+    draw = stat_data["平局概率"] * w1 + gua_data["平局概率"] * w2
+    away = stat_data["客胜概率"] * w1 + gua_data["客胜概率"] * w2
 
-    # ---- V9.3.12 新增修正 ----
-    # 巴西乙主场独立系数
-    if league_key == "巴西乙":
-        exp += 0.18  # 独立主场加成
+    total = home + draw + away
+    home = round(home / total, 4)
+    draw = round(draw / total, 4)
+    away = round(away / total, 4)
 
-    exp = max(exp, 1.0)
+    best = max([("主胜", home), ("平局", draw), ("客胜", away)], key=lambda x: x[1])
+    return {
+        "主胜概率": home,
+        "平局概率": draw,
+        "客胜概率": away,
+        "模型推荐": best[0],
+        "置信分值": best[1]
+    }
 
-    # ---- 比分离散化 ----
-    total = exp
-    home_ratio = 0.5 + diff * 0.06  # 主场系数0.06
-    home_ratio = max(0.3, min(0.7, home_ratio))
 
-    # ---- 平局溢价（仅当 diff==0 且双方无保级/无欲标签） ----
-    if diff == 0 and "保级" not in extra and "无欲" not in extra:
-        home_ratio = 0.5
+# =========================================================
+# 模块4：比分 & 总进球 & 半全场预测（扩展）
+# =========================================================
+def poisson_score_matrix(home_avg, away_avg, max_goals=6):
+    probs = {}
+    for hg in range(max_goals + 1):
+        for ag in range(max_goals + 1):
+            p = poisson.pmf(hg, home_avg) * poisson.pmf(ag, away_avg)
+            probs[(hg, ag)] = p
+    return probs
 
-    # 低级别弱队平局溢价
-    if league_key in ["巴西乙", "芬甲", "挪甲"] and home_str <= 2 and away_str <= 2:
-        home_ratio = 0.5
-
-    home_exp = total * home_ratio
-    away_exp = total * (1 - home_ratio)
-
-    # ---- 枚举比分 + 方向奖励 ----
-    candidates = []
-    for h in range(6):
-        for a in range(6):
-            if h + a == 0: continue
-            diff_score = abs(h - home_exp) + abs(a - away_exp)
-            reward = 0.0
-            if diff > 0 and h > a:
-                reward = diff * 0.30 * (h - a)
-            elif diff < 0 and h < a:
-                reward = abs(diff) * 0.30 * (a - h)
-            score = diff_score - reward
-            candidates.append((score, h, a))
-    candidates.sort(key=lambda x: x[0])
-    unique = []
-    for _, h, a in candidates:
-        if (h,a) not in unique:
-            unique.append((h,a))
-        if len(unique) >= 4: break
-    if len(unique) < 4:
-        common = [(1,1),(2,1),(1,0),(0,1),(2,0),(0,2)]
-        for s in common:
-            if s not in unique:
-                unique.append(s)
-            if len(unique) >= 4: break
-    best = unique[:4]
-    first_score = best[0]
-    second_score = best[1] if len(best) > 1 else first_score
-
-    # ---- 方向判定 ----
-    def res(h,a):
-        if h>a: return "主胜"
-        elif h<a: return "客胜"
-        else: return "平局"
-    first_res = res(first_score[0], first_score[1])
-    second_res = res(second_score[0], second_score[1])
-    if first_res == second_res and len(best)>1:
-        if len(best)>2:
-            second_score = best[2]
-            second_res = res(second_score[0], second_score[1])
+def aggregate_from_matrix(probs_matrix):
+    wdl = {'主胜': 0, '平局': 0, '客胜': 0}
+    total_goals = {}
+    for (hg, ag), p in probs_matrix.items():
+        if hg > ag:
+            wdl['主胜'] += p
+        elif hg == ag:
+            wdl['平局'] += p
         else:
-            second_res = "平局" if first_res != "平局" else "客胜"
+            wdl['客胜'] += p
+        tg = hg + ag
+        total_goals[tg] = total_goals.get(tg, 0) + p
+    return wdl, dict(sorted(total_goals.items()))
 
-    # ---- 置信度 ----
-    if "大吉" in gua_ji or "吉" in gua_ji: gua_score = 0.9
-    elif "凶" in gua_ji: gua_score = 0.5
-    else: gua_score = 0.7
+def most_likely_score(probs_matrix):
+    best = max(probs_matrix, key=probs_matrix.get)
+    return best, probs_matrix[best]
 
-    if (first_res=="主胜" and diff>0) or (first_res=="客胜" and diff<0) or (first_res=="平局" and abs(diff)<=0.5):
-        str_score = 0.9
-    else: str_score = 0.5
+def half_full_prob(home_avg, away_avg, half_ratio=0.4, max_goals=4):
+    home_half_avg = home_avg * half_ratio
+    away_half_avg = away_avg * half_ratio
+    half_probs = {'主胜': 0, '平局': 0, '客胜': 0}
+    for hg in range(max_goals + 1):
+        for ag in range(max_goals + 1):
+            p = poisson.pmf(hg, home_half_avg) * poisson.pmf(ag, away_half_avg)
+            if hg > ag:
+                half_probs['主胜'] += p
+            elif hg == ag:
+                half_probs['平局'] += p
+            else:
+                half_probs['客胜'] += p
+    full_probs, _ = aggregate_from_matrix(poisson_score_matrix(home_avg, away_avg, max_goals))
+    hf_probs = {}
+    for half_res in ['主胜', '平局', '客胜']:
+        for full_res in ['主胜', '平局', '客胜']:
+            key = f"{half_res}_{full_res}"
+            hf_probs[key] = half_probs.get(half_res, 0) * full_probs.get(full_res, 0)
+    total = sum(hf_probs.values())
+    if total > 0:
+        for k in hf_probs:
+            hf_probs[k] /= total
+    return hf_probs
 
-    wuxing_score = 0.8 if wuxing>0 else (0.5 if wuxing<0 else 0.6)
-    conf = int((gua_score*0.4 + str_score*0.35 + wuxing_score*0.25)*100)
+def predict_extended(home, away, league, home_avg, away_avg):
+    """比分、总进球、半全场预测（纯统计部分）"""
+    matrix = poisson_score_matrix(home_avg, away_avg, max_goals=6)
+    _, tg = aggregate_from_matrix(matrix)
+    best_score, best_prob = most_likely_score(matrix)
+    hf = half_full_prob(home_avg, away_avg, half_ratio=0.4, max_goals=4)
+    sorted_hf = sorted(hf.items(), key=lambda x: -x[1])[:3]
+    return {
+        "最可能比分": f"{best_score[0]}:{best_score[1]}",
+        "比分概率": round(best_prob, 4),
+        "总进球分布": tg,
+        "半全场Top3": sorted_hf
+    }
 
-    if home_str==5 and away_str<=2 and first_res=="主胜" and first_score[0]-first_score[1]>=2:
-        conf = min(conf, 75)
-    if league_key == "美职联": conf = min(conf, 45)
 
-    # ---- 方向强制修正（保留，但平局溢价已前置处理） ----
-    if league_key=="英超" and home_str<=2 and away_str>=4:
-        if first_res != "平局" and second_res != "平局": second_res = "平局"
-    if away_str==5 and first_res!="平局" and second_res!="平局": second_res = "平局"
-    if league_key=="意甲" and home_str >= away_str+2 and first_res!="平局":
-        if second_res!="平局": second_res = "平局"
-    if league_key=="西甲" and home=="马德里竞技" and away_str<=4:
-        if first_res=="主胜" and conf>55:
-            conf -= 5
-            second_res = "平局"
-    if league_key=="德甲" and home_str<=3 and away_str>=4:
-        if first_res=="客胜":
-            first_res = "平局"
-            second_res = "主胜"
-    if league_key=="西甲" and "保级客场" in extra and away_str<=2:
-        if first_res=="主胜":
-            first_res = "平局"
-            second_res = "客胜"
+# =========================================================
+# Streamlit UI
+# =========================================================
 
-    return first_res, second_res, first_score, conf, zhu, bian, gua_ji
+# ===== 侧边栏 =====
+with st.sidebar:
+    st.header("⚙️ 模型权重配置")
+    stat_weight = st.slider("数理模型权重", min_value=0.4, max_value=0.9, value=0.7, step=0.05)
+    gua_weight = round(1 - stat_weight, 2)
+    st.info(f"当前配置：数理 {stat_weight} | 卦象 {gua_weight}")
 
-# ============================================================
-# 7. Streamlit 界面（单场输入版）
-# ============================================================
-def main():
-    st.markdown("### 请输入单场比赛信息")
-    league = st.text_input("联赛", placeholder="例如：瑞典超")
-    date_time = st.text_input("日期时间", placeholder="例如：07-07 01:00")
-    home = st.text_input("主队", placeholder="例如：赫根")
-    away = st.text_input("客队", placeholder="例如：佐加顿斯")
-    if st.button("🚀 预测"):
-        if not league or not date_time or not home or not away:
-            st.warning("请完整填写所有字段")
-            return
-        first, second, score, conf, zhu, bian, gua = predict_match(league, date_time, home, away)
-        st.success("预测结果")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("首推方向", first)
-        col2.metric("次推方向", second)
-        col3.metric("预测比分", f"{score[0]}-{score[1]}")
-        col4.metric("置信度", f"{conf}%")
-        st.caption(f"卦象：{zhu}→{bian}，{gua}")
+    league_options = ["英超", "西甲", "意甲", "德甲", "法甲", "K1联赛", "K2联赛", "J1联赛", "J2联赛"]
+    select_leagues = st.multiselect("筛选联赛", league_options, default=["K1联赛", "J1联赛"])
 
-if __name__ == "__main__":
-    main()
+    run_mode = st.radio("运行模式", ["单场分析", "批量赛程预测"])
+
+    st.divider()
+    st.caption("【重要提示】模型仅作数据推演研究，购彩请理性。卦象仅作为趋势辅助，不存在百分百精准预测。")
+
+
+# ===== 单场分析 =====
+if run_mode == "单场分析":
+    col1, col2 = st.columns(2)
+    with col1:
+        home_team = st.text_input("主队名称")
+        league = st.selectbox("联赛", league_options, index=5)
+    with col2:
+        away_team = st.text_input("客队名称")
+        kick_time = st.text_input("开赛时间（格式：03-07 13:00）", value="03-07 13:00")
+
+    col3, col4 = st.columns(2)
+    with col3:
+        home_attack = st.number_input("主队进攻系数", value=1.0, step=0.05)
+        home_defense = st.number_input("主队防守系数", value=1.0, step=0.05)
+    with col4:
+        away_attack = st.number_input("客队进攻系数", value=1.0, step=0.05)
+        away_defense = st.number_input("客队防守系数", value=1.0, step=0.05)
+
+    if st.button("开始运算预测", type="primary"):
+        if not home_team or not away_team:
+            st.warning("请填写主客队名称！")
+        else:
+            with st.spinner("1. 数理模型计算中..."):
+                stat_result = predict_match_stat(home_team, away_team, league,
+                                                 home_attack, away_attack,
+                                                 home_defense, away_defense)
+
+            with st.spinner("2. 模拟铜钱起卦推演..."):
+                gua_result = coin_sim_gua(home_team, away_team, kick_time, league)
+
+            with st.spinner("3. 融合加权计算最终概率..."):
+                final_result = fusion_calc(stat_result, gua_result, stat_weight, gua_weight)
+
+            # 扩展预测
+            league_avg = LEAGUE_AVG_TOTAL.get(league, 2.5)
+            home_avg = (league_avg / 2) * home_attack / away_defense
+            away_avg = (league_avg / 2) * away_attack / home_defense
+            extended = predict_extended(home_team, away_team, league, home_avg, away_avg)
+
+            st.divider()
+
+            # 融合结果
+            st.subheader("🎯 融合预测结果")
+            col_res1, col_res2, col_res3 = st.columns(3)
+            col_res1.metric("主胜", f"{final_result['主胜概率']:.1%}")
+            col_res2.metric("平局", f"{final_result['平局概率']:.1%}")
+            col_res3.metric("客胜", f"{final_result['客胜概率']:.1%}")
+            st.success(f"✅ 模型推荐：**{final_result['模型推荐']}**（置信度 {final_result['置信分值']:.1%}）")
+
+            # 比分 & 总进球 & 半全场
+            st.subheader("📊 比分 & 总进球 & 半全场")
+            col_e1, col_e2 = st.columns(2)
+            with col_e1:
+                st.metric("最可能比分", extended["最可能比分"], f"概率 {extended['比分概率']:.1%}")
+                st.write("**总进球分布**")
+                tg_df = pd.DataFrame([extended["总进球分布"]]).T.reset_index()
+                tg_df.columns = ["进球数", "概率"]
+                st.dataframe(tg_df, use_container_width=True, hide_index=True)
+            with col_e2:
+                st.write("**半全场 Top3**")
+                for k, v in extended["半全场Top3"]:
+                    st.write(f"• {k.replace('_', ' → ')}：{v:.1%}")
+
+            # 分层详情
+            with st.expander("📋 分层结果详情"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.subheader("数理模型")
+                    st.dataframe(pd.DataFrame([stat_result]), use_container_width=True)
+                with c2:
+                    st.subheader("六爻卦象")
+                    st.dataframe(pd.DataFrame([gua_result]), use_container_width=True)
+                with c3:
+                    st.subheader("融合结果")
+                    st.dataframe(pd.DataFrame([final_result]), use_container_width=True)
+
+
+# ===== 批量赛程 =====
+elif run_mode == "批量赛程预测":
+    st.info("上传赛程 CSV，表头：league,date,home,away")
+    upload_file = st.file_uploader("上传赛程文件", type=["csv"])
+
+    if upload_file:
+        df_schedule = pd.read_csv(upload_file, encoding="utf-8-sig")
+        df_filter = df_schedule[df_schedule["league"].isin(select_leagues)]
+        st.dataframe(df_filter, use_container_width=True)
+
+        if st.button("批量启动全部预测", type="primary"):
+            output_list = []
+            progress_bar = st.progress(0)
+            total = len(df_filter)
+
+            for idx, row in df_filter.iterrows():
+                progress_bar.progress((idx + 1) / total)
+                ht = row["home"]
+                at = row["away"]
+                dt = row["date"]
+                lg = row["league"]
+
+                stat_res = predict_match_stat(ht, at, lg)
+                gua_res = coin_sim_gua(ht, at, dt, lg)
+                final_res = fusion_calc(stat_res, gua_res, stat_weight, gua_weight)
+
+                final_res["联赛"] = lg
+                final_res["开赛时间"] = dt
+                final_res["主队"] = ht
+                final_res["客队"] = at
+                output_list.append(final_res)
+
+            result_df = pd.DataFrame(output_list)
+            st.success("✅ 批量运算完成！")
+            st.dataframe(result_df, use_container_width=True)
+
+            csv_data = result_df.to_csv(index=False, encoding="utf-8-sig")
+            st.download_button("📥 下载预测结果 CSV", data=csv_data,
+                               file_name="fusion_prediction.csv", mime="text/csv")
