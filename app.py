@@ -29,7 +29,7 @@ LIUQIN_MAP = {
     "子孙": "替补/年轻球员/福神"
 }
 
-# ---------- 工具函数（提前定义）----------
+# ---------- 工具函数 ----------
 def get_wuxing(gua):
     return BAGUA_WUXING.get(gua, "土")
 
@@ -285,7 +285,7 @@ def get_shichen(match_time):
     shichen_index = (hour + 1) // 2 % 12
     return SHICHEN[shichen_index]
 
-# ---------- 起卦函数（修复后）----------
+# ---------- 起卦函数 ----------
 def generate_gua_info(home, away):
     clean_home = re.sub(r'[^\u4e00-\u9fa5]', '', home)
     clean_away = re.sub(r'[^\u4e00-\u9fa5]', '', away)
@@ -308,7 +308,6 @@ def generate_gua_info(home, away):
     inter_lower = "离" if lower != "坤" else "坤"
     body = upper
     use = lower
-    # 直接使用字典，避免函数未定义
     body_wuxing = BAGUA_WUXING.get(body, "土")
     use_wuxing = BAGUA_WUXING.get(use, "土")
     if body_wuxing == use_wuxing:
@@ -345,7 +344,7 @@ def analyze_yao(gua_info, home, away):
     yao_details = []
     for i in range(6):
         yao_wuxing = wuxing_cycle[i]
-        liuqin = get_liuqin(body_wuxing, yao_wuxing)  # 现在 get_liuqin 已定义
+        liuqin = get_liuqin(body_wuxing, yao_wuxing)
         if liuqin == "官鬼":
             jixiong = "凶（受克）"
         elif liuqin == "妻财":
@@ -400,7 +399,7 @@ def get_bing_yao():
         "病药": "卦中无动爻克用，病药不显。"
     }
 
-# ---------- 综合判断胜平负（仅首推）----------
+# ---------- 综合判断胜平负（返回首推+次推）----------
 def predict_by_gua(home, away, match_time):
     gua_info = generate_gua_info(home, away)
     yao_details = analyze_yao(gua_info, home, away)
@@ -457,27 +456,25 @@ def predict_by_gua(home, away, match_time):
         elif "凶" in text or "灾" in text or "祸" in text or "损" in text:
             score_away += 0.5
 
-    # 只取最高分
-    max_score = max(score_home, score_away, score_draw)
-    if max_score == score_home and max_score > score_away and max_score > score_draw:
-        primary = "主胜"
-    elif max_score == score_away and max_score > score_home and max_score > score_draw:
-        primary = "客胜"
-    else:
-        primary = "平局"
+    # 生成排序列表
+    scores = [("主胜", score_home), ("平局", score_draw), ("客胜", score_away)]
+    scores.sort(key=lambda x: x[1], reverse=True)
+    primary = scores[0][0]
+    secondary = scores[1][0]  # 取第二名
 
     return {
         "gua_info": gua_info,
         "yao_details": yao_details,
         "bing_yao": bing_yao,
         "shichen": shichen,
-        "primary": primary
+        "primary": primary,
+        "secondary": secondary
     }
 
 # ================== UI 界面 ==================
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
 st.title("⚽ 卦象·足球胜平负")
-st.caption("依据主客队名称笔画起卦，结合比赛时辰杂占，推演胜平负方向（仅首推）")
+st.caption("依据主客队名称笔画起卦，结合比赛时辰杂占，推演胜平负方向（首推+次推）")
 
 with st.expander("📋 输入比赛信息", expanded=True):
     col1, col2 = st.columns(2)
@@ -501,7 +498,7 @@ if st.button("🔮 起卦推演", use_container_width=True):
         shichen = result["shichen"]
 
         st.divider()
-        st.markdown(f"## 🎯 推演结论：**{result['primary']}**")
+        st.markdown(f"## 🎯 推演结论：首推 **{result['primary']}**，次推 **{result['secondary']}**")
 
         with st.expander("🔮 卦象、六爻、杂占详情（点击展开）", expanded=True):
             st.markdown("### 起卦依据")
