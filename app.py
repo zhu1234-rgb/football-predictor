@@ -4,13 +4,13 @@ import re
 
 # ---------- PWA 配置 ----------
 st.set_page_config(
-    page_title="卦象·足球胜平负",
+    page_title="卦象+数据·足球胜平负",
     page_icon="⚽",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# ================== 传统文化核心库 ==================
+# ================== 传统文化核心库（同前，未改动）==================
 BAGUA_WUXING = {
     "乾": "金", "兑": "金", "离": "火", "震": "木",
     "巽": "木", "坎": "水", "艮": "土", "坤": "土"
@@ -29,7 +29,6 @@ LIUQIN_MAP = {
     "子孙": "替补/年轻球员/福神"
 }
 
-# ---------- 工具函数 ----------
 def get_wuxing(gua):
     return BAGUA_WUXING.get(gua, "土")
 
@@ -43,7 +42,6 @@ def get_liuqin(body_wuxing, yao_wuxing):
     }
     return relations.get((body_wuxing, yao_wuxing), "比和")
 
-# ================== 六十四卦辞象 ==================
 GUA_DICT = {
     "乾乾": {"name": "乾为天", "gua_ci": "元亨利贞。", "xiang_ci": "天行健，君子以自强不息。"},
     "坤坤": {"name": "坤为地", "gua_ci": "元亨，利牝马之贞。君子有攸往，先迷后得主，利西南得朋，东北丧朋，安贞吉。", "xiang_ci": "地势坤，君子以厚德载物。"},
@@ -114,7 +112,6 @@ GUA_DICT = {
 # ================== 笔画字典（覆盖五大联赛、J/K联赛）==================
 def count_strokes(name):
     stroke_dict = {
-        # 基础汉字
         "德": 15, "国": 8, "西": 6, "班": 10, "牙": 4,
         "南": 9, "非": 8, "加": 5, "拿": 10, "大": 3,
         "巴": 4, "阿": 7, "根": 10, "廷": 6,
@@ -146,7 +143,6 @@ def count_strokes(name):
         "埃": 10, "及": 3,
         "纳": 7,
         "刚": 6, "果": 8, "佛": 7, "角": 7,
-        # 新增五大联赛 + J/K
         "切": 4, "城": 9, "军": 6, "冠": 9,
         "竞": 10, "那": 6, "不": 4, "勒": 11,
         "沃": 7, "库": 7, "森": 12, "蒙": 13,
@@ -399,8 +395,15 @@ def get_bing_yao():
         "病药": "卦中无动爻克用，病药不显。"
     }
 
-# ---------- 综合判断胜平负（返回首推+次推）----------
-def predict_by_gua(home, away, match_time):
+# ---------- 综合判断（加入近10场数据修正）----------
+def predict_by_gua(home, away, match_time, home_goals=0, home_conceded=0, away_goals=0, away_conceded=0):
+    """
+    参数：
+    home_goals: 主队近10场总进球数
+    home_conceded: 主队近10场总失球数
+    away_goals: 客队近10场总进球数
+    away_conceded: 客队近10场总失球数
+    """
     gua_info = generate_gua_info(home, away)
     yao_details = analyze_yao(gua_info, home, away)
     bing_yao = get_bing_yao()
@@ -410,6 +413,7 @@ def predict_by_gua(home, away, match_time):
     score_away = 0
     score_draw = 0
 
+    # ---- 卦象评分 ----
     # 体用生克
     ti = gua_info["ti_yong"]
     if ti == "体克用（主队制胜）":
@@ -444,7 +448,7 @@ def predict_by_gua(home, away, match_time):
             elif yao["liuqin"] in ["妻财"]:
                 score_away -= 1
 
-    # 杂占综合
+    # 杂占
     za_items = [MIAN_RE[shichen], YAN_TIAO[shichen]['左'], YAN_TIAO[shichen]['右'],
                 ER_RE[shichen], ER_MING[shichen]['左'], ER_MING[shichen]['右'],
                 JIN_MING[shichen], HUO_YI[shichen], QUAN_OU[shichen],
@@ -456,11 +460,41 @@ def predict_by_gua(home, away, match_time):
         elif "凶" in text or "灾" in text or "祸" in text or "损" in text:
             score_away += 0.5
 
-    # 生成排序列表
+    # ---- 实力修正（基于近10场数据） ----
+    # 如果用户没有输入数据（全为0），则不进行修正
+    if home_goals > 0 or home_conceded > 0 or away_goals > 0 or away_conceded > 0:
+        # 计算场均
+        home_avg_goals = home_goals / 10
+        home_avg_conceded = home_conceded / 10
+        away_avg_goals = away_goals / 10
+        away_avg_conceded = away_conceded / 10
+
+        # 进攻分（场均进球，归一化到0~2之间，典型场均进球0~2.5）
+        home_off = min(2.0, home_avg_goals / 1.5)  # 1.5球为基准，最高2分
+        away_off = min(2.0, away_avg_goals / 1.5)
+        # 防守分（场均失球，失球越少分越高，0~2分）
+        home_def = max(0, 2.0 - home_avg_conceded / 0.8)  # 0.8失球为基准
+        away_def = max(0, 2.0 - away_avg_conceded / 0.8)
+
+        # 综合实力分 = 进攻分*0.6 + 防守分*0.4
+        home_strength = home_off * 0.6 + home_def * 0.4
+        away_strength = away_off * 0.6 + away_def * 0.4
+
+        # 实力差（主-客），作为修正值加到主队得分上
+        diff = home_strength - away_strength
+        # 修正系数，控制影响幅度，这里取1.0（直接加）
+        score_home += diff
+        score_away -= diff  # 客队等量减少（也可不处理，但为了公平）
+
+        # 确保得分不为负
+        score_home = max(0, score_home)
+        score_away = max(0, score_away)
+
+    # 排序
     scores = [("主胜", score_home), ("平局", score_draw), ("客胜", score_away)]
     scores.sort(key=lambda x: x[1], reverse=True)
     primary = scores[0][0]
-    secondary = scores[1][0]  # 取第二名
+    secondary = scores[1][0]
 
     return {
         "gua_info": gua_info,
@@ -473,25 +507,38 @@ def predict_by_gua(home, away, match_time):
 
 # ================== UI 界面 ==================
 st.image("https://img.icons8.com/color/96/000000/football2.png", width=80)
-st.title("⚽ 卦象·足球胜平负")
-st.caption("依据主客队名称笔画起卦，结合比赛时辰杂占，推演胜平负方向（首推+次推）")
+st.title("⚽ 卦象+数据·足球胜平负")
+st.caption("输入球队名称、比赛时间，以及近10场进球/失球数（可选）")
 
 with st.expander("📋 输入比赛信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
-        home = st.text_input("主队名称", placeholder="如：皇家马德里")
+        home = st.text_input("主队名称", placeholder="如：富川")
     with col2:
-        away = st.text_input("客队名称", placeholder="如：巴塞罗那")
+        away = st.text_input("客队名称", placeholder="如：安养")
 
     match_date = st.date_input("比赛日期", value=datetime.date.today())
     match_time_sel = st.time_input("比赛时间（开球时刻）", value=datetime.time(0, 0))
     match_time = datetime.datetime.combine(match_date, match_time_sel)
 
+    st.subheader("近10场数据（可选，不填则仅使用卦象）")
+    col3, col4 = st.columns(2)
+    with col3:
+        home_goals = st.number_input("主队总进球", min_value=0, value=0, step=1)
+        home_conceded = st.number_input("主队总失球", min_value=0, value=0, step=1)
+    with col4:
+        away_goals = st.number_input("客队总进球", min_value=0, value=0, step=1)
+        away_conceded = st.number_input("客队总失球", min_value=0, value=0, step=1)
+
 if st.button("🔮 起卦推演", use_container_width=True):
     if not home or not away:
         st.error("请输入主客队名称")
     else:
-        result = predict_by_gua(home, away, match_time)
+        result = predict_by_gua(
+            home, away, match_time,
+            home_goals, home_conceded,
+            away_goals, away_conceded
+        )
         gua = result["gua_info"]
         yao = result["yao_details"]
         bing = result["bing_yao"]
@@ -545,4 +592,8 @@ if st.button("🔮 起卦推演", use_container_width=True):
                 st.markdown(f"**心惊**：{XIN_JING[shichen]}")
                 st.markdown(f"**鹊噪**：{QUE_ZAO[shichen]}")
 
-        st.caption("注：本推演基于传统易学与杂占，仅供娱乐参考。")
+        # 如果有输入数据，显示实力分修正值
+        if home_goals > 0 or home_conceded > 0 or away_goals > 0 or away_conceded > 0:
+            st.caption("注：已根据近10场数据对卦象结果进行修正。")
+
+        st.caption("注：本推演基于传统易学与杂占，结合球队近况数据，仅供娱乐参考。")
