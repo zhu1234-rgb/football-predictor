@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
 六爻足球胜平负预测（输入卦名自动匹配）
 用法：修改下方 MAIN_GUA 和 BIAN_GUA 为卦名，运行即出结果。
 """
 
 import datetime
+import sys
 
 # ==================== 输入区（修改此处） ====================
 MAIN_GUA = "火雷噬嗑"    # 主卦名，如 "火雷噬嗑"
@@ -19,12 +19,8 @@ YEAR, MONTH, DAY, HOUR = 2026, 7, 22, 18   # 比赛时间
 TIAN_GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
 DI_ZHI   = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥']
 
-# 八卦编号
 BAGUA = {1:'乾', 2:'兑', 3:'离', 4:'震', 5:'巽', 6:'坎', 7:'艮', 8:'坤'}
-# 符号与编号映射
 SYM_TO_NUM = {'天':1, '泽':2, '火':3, '雷':4, '风':5, '水':6, '山':7, '地':8}
-NUM_TO_SYM = {v:k for k,v in SYM_TO_NUM.items()}
-
 BAGUA_WUXING = {
     '乾':'金', '兑':'金',
     '震':'木', '巽':'木',
@@ -32,7 +28,6 @@ BAGUA_WUXING = {
     '离':'火',
     '艮':'土', '坤':'土'
 }
-
 NAJIA_DIZHI = {
     '乾': ['子','寅','辰','午','申','戌'],
     '震': ['子','寅','辰','午','申','戌'],
@@ -45,11 +40,9 @@ NAJIA_DIZHI = {
 }
 
 # ---------- 完整的六十四卦信息 ----------
-# 结构：'卦名': {'upper':上卦编号, 'lower':下卦编号, 'palace':宫编号, 'shi':世位(1~6), 'ying':应位, 'chong':bool, 'he':bool, 'youhun':bool, 'guihun':bool}
 GUA_INFO = {}
 
 def _init_gua_info():
-    # 八宫列表（按顺序：本宫, 一世, 二世, 三世, 四世, 五世, 游魂, 归魂）
     palaces = {
         1: ['乾为天', '天风姤', '天山遁', '天地否', '风地观', '山地剥', '火地晋', '火天大有'],
         2: ['兑为泽', '泽水困', '泽地萃', '泽山咸', '水山蹇', '地山谦', '雷山小过', '雷泽归妹'],
@@ -60,13 +53,9 @@ def _init_gua_info():
         7: ['艮为山', '山火贲', '山天大畜', '山泽损', '火泽睽', '天泽履', '风泽中孚', '风山渐'],
         8: ['坤为地', '地雷复', '地泽临', '地天泰', '雷天大壮', '泽天夬', '水天需', '水地比']
     }
-    # 世位规则：位置索引0->6,1->1,2->2,3->3,4->4,5->5,6->4(游魂),7->3(归魂)
     shi_pos = [6,1,2,3,4,5,4,3]
-    # 六合卦列表（常用）
     he_list = ['地天泰', '天地否', '泽山咸', '雷风恒', '水泽节', '火山旅', '山泽损', '泽地萃']
-    # 六冲卦就是八纯卦
     chong_list = ['乾为天', '兑为泽', '离为火', '震为雷', '巽为风', '坎为水', '艮为山', '坤为地']
-    # 游魂卦：每宫第七个；归魂卦：每宫第八个
     for palace, names in palaces.items():
         for idx, name in enumerate(names):
             shi = shi_pos[idx]
@@ -75,33 +64,21 @@ def _init_gua_info():
                 ying -= 6
             chong = name in chong_list
             he = name in he_list
-            youhun = (idx == 6)
-            guihun = (idx == 7)
-            # 解析上下卦：从名字中提取符号
-            # 规则：第一个字符（若为'乾'等直接是卦名，则特殊处理；否则取前两个字符）
+            # 解析上下卦
             if name in ['乾为天','坤为地','坎为水','离为火','震为雷','巽为风','艮为山','兑为泽']:
-                # 八纯卦名格式：卦名+为+符号，例如'乾为天' -> 上乾下乾
-                upper_sym = name[0]  # 乾
-                lower_sym = name[2]  # 天（但实际也是乾）
-                # 但对于'乾为天'，lower_sym is '天'，我们需要映射到乾
-                # 但最好直接用符号映射：乾->乾
-                upper_num = SYM_TO_NUM.get(upper_sym, None)
-                lower_num = SYM_TO_NUM.get(lower_sym, None)
-                if upper_num is None:
-                    # 若字符是卦名，直接映射
-                    upper_num = {v:k for k,v in BAGUA.items()}[upper_sym]
-                if lower_num is None:
-                    lower_num = {v:k for k,v in BAGUA.items()}[lower_sym]
+                # 八纯卦：名字如'乾为天'，上卦乾，下卦乾
+                upper_sym = name[0]
+                lower_sym = name[2]
             else:
-                # 一般名称：前两个字符是符号，如'火雷噬嗑' -> 火,雷
                 upper_sym = name[0]
                 lower_sym = name[1]
-                upper_num = SYM_TO_NUM.get(upper_sym, None)
-                lower_num = SYM_TO_NUM.get(lower_sym, None)
-                if upper_num is None:
-                    upper_num = {v:k for k,v in BAGUA.items()}[upper_sym]
-                if lower_num is None:
-                    lower_num = {v:k for k,v in BAGUA.items()}[lower_sym]
+            upper_num = SYM_TO_NUM.get(upper_sym)
+            lower_num = SYM_TO_NUM.get(lower_sym)
+            if upper_num is None:
+                # 如果符号不在映射中，尝试从卦名直接映射（如'乾'）
+                upper_num = {v:k for k,v in BAGUA.items()}.get(upper_sym)
+            if lower_num is None:
+                lower_num = {v:k for k,v in BAGUA.items()}.get(lower_sym)
             GUA_INFO[name] = {
                 'upper': upper_num,
                 'lower': lower_num,
@@ -109,9 +86,7 @@ def _init_gua_info():
                 'shi': shi,
                 'ying': ying,
                 'chong': chong,
-                'he': he,
-                'youhun': youhun,
-                'guihun': guihun
+                'he': he
             }
 
 _init_gua_info()
@@ -150,7 +125,6 @@ def get_liuqin(wx, gong_wx):
     return ''
 
 def get_yue_zhi(year, month, day):
-    # 节气近似
     if (month == 1 and day >= 6) or (month == 2 and day < 4):
         return 1
     elif (month == 2 and day >= 4) or (month == 3 and day < 6):
@@ -187,13 +161,10 @@ def get_day_gz_index(year, month, day):
 
 # ---------- 排盘核心 ----------
 def pai_pan(main_name, bian_name):
-    """
-    根据卦名获取完整排盘信息
-    返回 (main_info, bian_info)
-    main_info: {name, upper, lower, palace, gong_wuxing, shi, ying, dizhi, liuqin, shi_ying, chong, he, youhun, guihun}
-    """
-    main = GUA_INFO[main_name]
-    bian = GUA_INFO[bian_name]
+    main = GUA_INFO.get(main_name)
+    bian = GUA_INFO.get(bian_name)
+    if main is None or bian is None:
+        raise ValueError(f"卦名不存在：{main_name} 或 {bian_name}")
 
     main_upper = main['upper']
     main_lower = main['lower']
@@ -202,11 +173,9 @@ def pai_pan(main_name, bian_name):
     main_shi = main['shi']
     main_ying = main['ying']
 
-    # 获取地支
     upper_name = BAGUA[main_upper]
     lower_name = BAGUA[main_lower]
-    dizhi = NAJIA_DIZHI[lower_name][0:3] + NAJIA_DIZHI[upper_name][0:3]  # 初爻到上爻
-    # 六亲
+    dizhi = NAJIA_DIZHI[lower_name][0:3] + NAJIA_DIZHI[upper_name][0:3]
     liuqin = [get_liuqin(wuxing_of_dizhi(dz), main_gong_wuxing) for dz in dizhi]
     shi_ying = [''] * 6
     shi_ying[main_shi-1] = '世'
@@ -214,8 +183,6 @@ def pai_pan(main_name, bian_name):
 
     main_info = {
         'name': main_name,
-        'upper': main_upper,
-        'lower': main_lower,
         'palace': main_palace,
         'gong_wuxing': main_gong_wuxing,
         'shi': main_shi,
@@ -224,12 +191,9 @@ def pai_pan(main_name, bian_name):
         'liuqin': liuqin,
         'shi_ying': shi_ying,
         'chong': main['chong'],
-        'he': main['he'],
-        'youhun': main['youhun'],
-        'guihun': main['guihun']
+        'he': main['he']
     }
 
-    # 变卦类似
     bian_upper = bian['upper']
     bian_lower = bian['lower']
     bian_palace = bian['palace']
@@ -244,9 +208,7 @@ def pai_pan(main_name, bian_name):
         'dizhi': bian_dizhi,
         'liuqin': bian_liuqin,
         'chong': bian['chong'],
-        'he': bian['he'],
-        'youhun': bian['youhun'],
-        'guihun': bian['guihun']
+        'he': bian['he']
     }
     return main_info, bian_info
 
@@ -286,13 +248,15 @@ def duan_gua(main_info, bian_info, dong_yao_list, yue_zhi, ri_zhi):
         shi_score -= 1
         ying_score += 1
 
-    # 动爻影响
     for dong in dong_yao_list:
         idx = dong - 1
         if idx < 0 or idx > 5:
             continue
         main_dz = main_info['dizhi'][idx]
-        bian_dz = bian_info['dizhi'][idx] if idx < len(bian_info['dizhi']) else main_dz
+        if idx < len(bian_info['dizhi']):
+            bian_dz = bian_info['dizhi'][idx]
+        else:
+            bian_dz = main_dz
         sk_shi = sheng_ke(wuxing_of_dizhi(main_dz), wuxing_of_dizhi(shi_dz))
         sk_ying = sheng_ke(wuxing_of_dizhi(main_dz), wuxing_of_dizhi(ying_dz))
         if sk_shi == '生':
@@ -356,32 +320,37 @@ def duan_gua(main_info, bian_info, dong_yao_list, yue_zhi, ri_zhi):
 
 # ---------- 主程序 ----------
 def main():
-    # 计算月建、日辰
-    yue_idx = get_yue_zhi(YEAR, MONTH, DAY)
-    yue_zhi = DI_ZHI[yue_idx]
-    day_gz_idx = get_day_gz_index(YEAR, MONTH, DAY)
-    ri_gan = TIAN_GAN[day_gz_idx % 10]
-    ri_zhi = DI_ZHI[day_gz_idx % 12]
+    try:
+        # 计算月建、日辰
+        yue_idx = get_yue_zhi(YEAR, MONTH, DAY)
+        yue_zhi = DI_ZHI[yue_idx]
+        day_gz_idx = get_day_gz_index(YEAR, MONTH, DAY)
+        ri_gan = TIAN_GAN[day_gz_idx % 10]
+        ri_zhi = DI_ZHI[day_gz_idx % 12]
 
-    # 排盘
-    main_info, bian_info = pai_pan(MAIN_GUA, BIAN_GUA)
-    # 断卦
-    result, reason = duan_gua(main_info, bian_info, DONG_YAO, yue_zhi, ri_zhi)
+        # 排盘
+        main_info, bian_info = pai_pan(MAIN_GUA, BIAN_GUA)
+        # 断卦
+        result, reason = duan_gua(main_info, bian_info, DONG_YAO, yue_zhi, ri_zhi)
 
-    # 输出
-    print("=" * 50)
-    print("六爻足球赛事胜平负预测结果")
-    print("=" * 50)
-    print(f"主卦：{main_info['name']}（宫位五行{main_info['gong_wuxing']}） 世爻位：{main_info['shi']}，应爻位：{main_info['ying']}")
-    print("六爻信息（爻位 世应 地支 六亲）：")
-    for i in range(6):
-        print(f"  {i+1}爻 {main_info['shi_ying'][i]:2s} {main_info['dizhi'][i]:2s} {main_info['liuqin'][i]}")
-    print(f"变卦：{bian_info['name']}")
-    print(f"月建：{yue_zhi}  日辰：{ri_gan}{ri_zhi}")
-    print("-" * 50)
-    print(f"预测结果：{result}")
-    print("理由：", reason)
-    print("=" * 50)
+        # 输出结果
+        print("=" * 50)
+        print("六爻足球赛事胜平负预测结果")
+        print("=" * 50)
+        print(f"主卦：{main_info['name']}（宫位五行{main_info['gong_wuxing']}） 世爻位：{main_info['shi']}，应爻位：{main_info['ying']}")
+        print("六爻信息（爻位 世应 地支 六亲）：")
+        for i in range(6):
+            print(f"  {i+1}爻 {main_info['shi_ying'][i]:2s} {main_info['dizhi'][i]:2s} {main_info['liuqin'][i]}")
+        print(f"变卦：{bian_info['name']}")
+        print(f"月建：{yue_zhi}  日辰：{ri_gan}{ri_zhi}")
+        print("-" * 50)
+        print(f"预测结果：{result}")
+        print("理由：", reason)
+        print("=" * 50)
+    except Exception as e:
+        print("发生错误：", e)
+        import traceback
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main()
