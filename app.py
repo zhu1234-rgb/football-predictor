@@ -4,7 +4,7 @@ import pandas as pd
 
 st.set_page_config(page_title="⚽六爻足球预测", layout="wide")
 st.title("六爻足球胜平负预测系统")
-st.markdown("野鹤派六爻量化打分模型，无第三方农历依赖，云端直接运行")
+st.markdown("野鹤派六爻量化打分模型，无第三方农历依赖")
 
 # =====================基础常量=====================
 TIAN_GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
@@ -92,11 +92,8 @@ def shengke(wx1, wx2):
     if KE.get(wx1) == wx2: return '克'
     return ''
 
-# =====================【重点】内置节气换算 替代lunardate=====================
-# 二十四节气交接日近似表(公历年区间2000~2050适用)，推算月令
+# =====================内置节气换算=====================
 def get_month_zhi_by_solar(year, month, day):
-    # 节气对应地支：寅月立春~卯月惊蛰...
-    # 寅=1,卯=2,辰=3,巳=4,午=5,未=6,申=7,酉=8,戌=9,亥=10,子=11,丑=0
     jieqi_dates = [
         ("立春",2,4,1), ("惊蛰",3,6,2), ("清明",4,5,3), ("立夏",5,6,4),
         ("芒种",6,6,5), ("小暑",7,7,6), ("立秋",8,8,7), ("白露",9,8,8),
@@ -115,7 +112,6 @@ def get_month_zhi_by_solar(year, month, day):
         zhi_idx = 0
     return DI_ZHI[zhi_idx]
 
-# 日干支简易推算
 def day_gz_index(year, month, day):
     base = datetime.date(2000,1,1)
     target = datetime.date(year,month,day)
@@ -123,7 +119,6 @@ def day_gz_index(year, month, day):
     base_gz = 54
     return (base_gz + delta) % 60
 
-# 时干支
 def hour_gz(ri_gan, hour):
     start_map = {
         '甲':'甲','乙':'丙','丙':'戊','丁':'庚','戊':'壬',
@@ -136,7 +131,6 @@ def hour_gz(ri_gan, hour):
     real_zhi = DI_ZHI[zhi_idx]
     return real_gan + real_zhi
 
-# 旬空计算
 def get_xunkong(ri_gan, ri_zhi):
     g_idx = TIAN_GAN.index(ri_gan)
     z_idx = DI_ZHI.index(ri_zhi)
@@ -145,7 +139,6 @@ def get_xunkong(ri_gan, ri_zhi):
     k2 = DI_ZHI[(xun_head -1) %12]
     return (k1,k2)
 
-# 六神排序
 def liu_shen(ri_gan):
     start_map = {
         '甲':'青龙','乙':'青龙','丙':'朱雀','丁':'朱雀',
@@ -204,7 +197,7 @@ def pai_pan(main_name, bian_name, year, month, day, hour):
         }
     }
 
-# =====================量化打分引擎（完全保留原有28法逻辑不变）=====================
+# =====================量化打分引擎=====================
 def calc_scores(pan, dong_list):
     main = pan['main']
     bian = pan['bian']
@@ -218,8 +211,6 @@ def calc_scores(pan, dong_list):
     ying_dz = main['dizhi'][ying_idx]
     shi_wx = DZ_WX[shi_dz]
     ying_wx = DZ_WX[ying_dz]
-    shi_lq = main['liuqin'][shi_idx]
-    ying_lq = main['liuqin'][ying_idx]
 
     dims = {
         '月建旺衰': {'主':0,'客':0,'主评':'','客评':''},
@@ -366,6 +357,7 @@ def calc_scores(pan, dong_list):
     dims['动爻影响']['客'] = round(dong_ying_eff, 1)
     dims['动爻影响']['主评'] = ' | '.join(dong_notes) if dong_notes else '无动爻'
 
+    shi_lq = main['liuqin'][shi_idx]
     extra['六神格局']['主评'] = f"{pan['liushen'][shi_idx]}临世"
     extra['六神格局']['客评'] = f"{pan['liushen'][ying_idx]}临应"
 
@@ -406,19 +398,19 @@ def calc_scores(pan, dong_list):
     full_reason = reason + chong_he_note + liuqin_note
     return dims, extra, total_shi, total_ying, diff, result, full_reason
 
-# =====================页面UI=====================
+# =====================页面UI【修复number_input参数】=====================
 with st.form("predict_form"):
     col1, col2, col3 = st.columns([2,2,1])
     with col1:
-        main_gua = st.text_input("主卦名", "天雷无妄", help="例如：天雷无妄、火地晋")
-        bian_gua = st.text_input("变卦名", "天地否", help="例如：天地否")
+        main_gua = st.text_input("主卦名", value="天雷无妄", help="例如：天雷无妄、火地晋")
+        bian_gua = st.text_input("变卦名", value="天地否", help="例如：天地否")
     with col2:
-        dong_yao_str = st.text_input("动爻 (逗号分隔)", "1", help="多个动爻：1,3；无动爻留空")
+        dong_yao_str = st.text_input("动爻 (逗号分隔)", value="1", help="多个动爻：1,3；无动爻留空")
     with col3:
-        year = st.number_input("年", 2026, 2000, 2050, 1)
-        month = st.number_input("月", 7, 1, 12, 1)
-        day = st.number_input("日", 24, 1, 31, 1)
-        hour = st.number_input("时辰(0-23)", 18, 0, 23, 1)
+        year = st.number_input(label="年", value=2026, min_value=2000, max_value=2050)
+        month = st.number_input(label="月", value=7, min_value=1, max_value=12)
+        day = st.number_input(label="日", value=24, min_value=1, max_value=31)
+        hour = st.number_input(label="时辰(0-23)", value=18, min_value=0, max_value=23)
 
     submitted = st.form_submit_button("⚡ 开始预测计算")
 
