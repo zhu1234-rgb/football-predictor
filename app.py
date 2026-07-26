@@ -1,13 +1,12 @@
 import streamlit as st
 import datetime
 import pandas as pd
-from lunardate import LunarDate
 
-st.set_page_config(page_title="六爻足球预测", layout="wide")
-st.title("⚽ 六爻足球胜平负预测")
-st.markdown("基于野鹤派+量化打分规则，手动输入卦象与时间，自动排盘并展示五维评分详情。")
+st.set_page_config(page_title="⚽六爻足球预测", layout="wide")
+st.title("六爻足球胜平负预测系统")
+st.markdown("野鹤派六爻量化打分模型，无第三方农历依赖，云端直接运行")
 
-# ====================== 基础数据 ======================
+# =====================基础常量=====================
 TIAN_GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
 DI_ZHI   = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥']
 DZ_WX = {
@@ -32,7 +31,7 @@ NAJIA = {
     '兑': ['巳','卯','丑','亥','酉','未']
 }
 
-# ====================== 64卦数据库 ======================
+# =====================64卦库=====================
 GUA_DB = {}
 def _init_db():
     palaces = {
@@ -65,17 +64,20 @@ def _init_db():
             if ying > 6: ying -= 6
             is_youhun = (idx == youhun_idx[pal-1])
             is_guihun = (idx == guihun_idx[pal-1])
+            chong_gua = ['乾为天','兑为泽','离为火','震为雷','巽为风','坎为水','艮为山','坤为地']
+            he_gua = ['地天泰','天地否','泽山咸','雷风恒','水泽节','火山旅','山泽损','泽地萃']
             GUA_DB[name] = {
                 'upper': upper_num, 'lower': lower_num,
                 'palace': pal,
                 'shi': shi, 'ying': ying,
-                'chong': name in ['乾为天','兑为泽','离为火','震为雷','巽为风','坎为水','艮为山','坤为地'],
-                'he': name in ['地天泰','天地否','泽山咸','雷风恒','水泽节','火山旅','山泽损','泽地萃'],
+                'chong': name in chong_gua,
+                'he': name in he_gua,
                 'youhun': is_youhun,
                 'guihun': is_guihun
             }
 _init_db()
 
+# =====================通用工具函数=====================
 def get_liuqin(yao_wx, gong_wx):
     if yao_wx == gong_wx: return '兄弟'
     if SHENG[yao_wx] == gong_wx: return '父母'
@@ -90,59 +92,74 @@ def shengke(wx1, wx2):
     if KE.get(wx1) == wx2: return '克'
     return ''
 
-# ====================== 节气取月支 ======================
-SOLAR_TERM_MONTH_MAP = {
-    '小寒':0, '立春':1, '惊蛰':2, '清明':3, '立夏':4, '芒种':5,
-    '小暑':6, '立秋':7, '白露':8, '寒露':9, '立冬':10, '大雪':11
-}
-def get_yue_zhi_by_jieqi(year, month, day):
-    dt = datetime.date(year, month, day)
-    lunar = LunarDate.fromSolarDate(year, month, day)
-    jieqi = lunar.getSolarTerm()
-    zhi_idx = SOLAR_TERM_MONTH_MAP.get(jieqi, None)
+# =====================【重点】内置节气换算 替代lunardate=====================
+# 二十四节气交接日近似表(公历年区间2000~2050适用)，推算月令
+def get_month_zhi_by_solar(year, month, day):
+    # 节气对应地支：寅月立春~卯月惊蛰...
+    # 寅=1,卯=2,辰=3,巳=4,午=5,未=6,申=7,酉=8,戌=9,亥=10,子=11,丑=0
+    jieqi_dates = [
+        ("立春",2,4,1), ("惊蛰",3,6,2), ("清明",4,5,3), ("立夏",5,6,4),
+        ("芒种",6,6,5), ("小暑",7,7,6), ("立秋",8,8,7), ("白露",9,8,8),
+        ("寒露",10,9,9), ("立冬",11,8,10), ("大雪",12,7,11), ("小寒",1,6,0)
+    ]
+    current_dt = datetime.date(year,month,day)
+    zhi_idx = None
+    for jq_name,m,d,idx in jieqi_dates:
+        jq_year = year
+        if m == 1:
+            jq_year = year+1
+        jq_dt = datetime.date(jq_year, m, d)
+        if current_dt >= jq_dt:
+            zhi_idx = idx
     if zhi_idx is None:
-        prev_day = dt - datetime.timedelta(days=1)
-        prev_lunar = LunarDate.fromSolarDate(prev_day.year, prev_day.month, prev_day.day)
-        zhi_idx = SOLAR_TERM_MONTH_MAP[prev_lunar.getSolarTerm()]
+        zhi_idx = 0
     return DI_ZHI[zhi_idx]
 
+# 日干支简易推算
 def day_gz_index(year, month, day):
-    ref = datetime.datetime(2000,1,1)
-    target = datetime.datetime(year, month, day)
-    ref_delta = (ref - datetime.datetime(1,1,1)).days
-    target_delta = (target - datetime.datetime(1,1,1)).days
-    ref_idx = 54
-    return (ref_idx + (target_delta - ref_delta)) % 60
+    base = datetime.date(2000,1,1)
+    target = datetime.date(year,month,day)
+    delta = (target - base).days
+    base_gz = 54
+    return (base_gz + delta) % 60
 
-def hour_gz(day_gan, hour):
-    start_gan = {'甲':'甲','乙':'丙','丙':'戊','丁':'庚','戊':'壬',
-                 '己':'甲','庚':'丙','辛':'戊','壬':'庚','癸':'壬'}
-    gan = start_gan[day_gan]
-    gan_idx = TIAN_GAN.index(gan)
-    zhi_idx = (hour + 1) // 2 % 12
+# 时干支
+def hour_gz(ri_gan, hour):
+    start_map = {
+        '甲':'甲','乙':'丙','丙':'戊','丁':'庚','戊':'壬',
+        '己':'甲','庚':'丙','辛':'戊','壬':'庚','癸':'壬'
+    }
+    gan_start = start_map[ri_gan]
+    gan_idx = TIAN_GAN.index(gan_start)
+    zhi_idx = (hour + 1)//2 % 12
     real_gan = TIAN_GAN[(gan_idx + zhi_idx) % 10]
     real_zhi = DI_ZHI[zhi_idx]
     return real_gan + real_zhi
 
+# 旬空计算
 def get_xunkong(ri_gan, ri_zhi):
-    gan_idx = TIAN_GAN.index(ri_gan)
-    zhi_idx = DI_ZHI.index(ri_zhi)
-    xun_shou_zhi_idx = (zhi_idx - gan_idx) % 12
-    kong1 = DI_ZHI[(xun_shou_zhi_idx - 2) % 12]
-    kong2 = DI_ZHI[(xun_shou_zhi_idx - 1) % 12]
-    return (kong1, kong2)
+    g_idx = TIAN_GAN.index(ri_gan)
+    z_idx = DI_ZHI.index(ri_zhi)
+    xun_head = (z_idx - g_idx) % 12
+    k1 = DI_ZHI[(xun_head - 2) %12]
+    k2 = DI_ZHI[(xun_head -1) %12]
+    return (k1,k2)
 
+# 六神排序
 def liu_shen(ri_gan):
-    start = {'甲':'青龙','乙':'青龙','丙':'朱雀','丁':'朱雀',
-             '戊':'勾陈','己':'螣蛇','庚':'白虎','辛':'白虎',
-             '壬':'玄武','癸':'玄武'}
+    start_map = {
+        '甲':'青龙','乙':'青龙','丙':'朱雀','丁':'朱雀',
+        '戊':'勾陈','己':'螣蛇','庚':'白虎','辛':'白虎',
+        '壬':'玄武','癸':'玄武'
+    }
     order = ['青龙','朱雀','勾陈','螣蛇','白虎','玄武']
-    idx = order.index(start[ri_gan])
-    return order[idx:] + order[:idx]
+    start = start_map[ri_gan]
+    pos = order.index(start)
+    return order[pos:] + order[:pos]
 
-# ====================== 排盘 ======================
+# =====================排盘函数=====================
 def pai_pan(main_name, bian_name, year, month, day, hour):
-    yue_zhi = get_yue_zhi_by_jieqi(year, month, day)
+    yue_zhi = get_month_zhi_by_solar(year, month, day)
     day_gz = day_gz_index(year, month, day)
     ri_gan = TIAN_GAN[day_gz % 10]
     ri_zhi = DI_ZHI[day_gz % 12]
@@ -151,7 +168,7 @@ def pai_pan(main_name, bian_name, year, month, day, hour):
     liushen = liu_shen(ri_gan)
 
     main = GUA_DB.get(main_name)
-    if not main: raise ValueError(f"主卦{main_name}不存在，请核对卦名")
+    if not main: raise ValueError(f"主卦【{main_name}】不存在，请核对名称！")
     gong_name = BAGUA[main['palace']]
     gong_wx = GUA_WX[gong_name]
     upper_name = BAGUA[main['upper']]
@@ -163,7 +180,7 @@ def pai_pan(main_name, bian_name, year, month, day, hour):
     shi_ying[main['ying']-1] = '应'
 
     bian = GUA_DB.get(bian_name)
-    if not bian: raise ValueError(f"变卦{bian_name}不存在，请核对卦名")
+    if not bian: raise ValueError(f"变卦【{bian_name}】不存在，请核对名称！")
     b_upper_name = BAGUA[bian['upper']]
     b_lower_name = BAGUA[bian['lower']]
     bian_dz = NAJIA[b_lower_name][:3] + NAJIA[b_upper_name][:3]
@@ -187,14 +204,13 @@ def pai_pan(main_name, bian_name, year, month, day, hour):
         }
     }
 
-# ====================== 核心打分引擎 ======================
+# =====================量化打分引擎（完全保留原有28法逻辑不变）=====================
 def calc_scores(pan, dong_list):
     main = pan['main']
     bian = pan['bian']
     yue_zhi = pan['yue_zhi']
     ri_zhi = pan['ri_zhi']
     kong = pan['kong']
-    liushen = pan['liushen']
 
     shi_idx = main['shi'] - 1
     ying_idx = main['ying'] - 1
@@ -268,7 +284,6 @@ def calc_scores(pan, dong_list):
     has_dong = len(dong_list) > 0
     shi_sanhe = False; ying_sanhe = False
     shi_zhongshen = False; ying_zhongshen = False
-    shi_fushen = False; ying_fushen = False
 
     all_dzs = main['dizhi'] + [ri_zhi] + dong_dzs
     for he in sanhe:
@@ -276,17 +291,15 @@ def calc_scores(pan, dong_list):
             if shi_dz in he:
                 shi_sanhe = True
                 if shi_dz == he[1]: shi_zhongshen = True
-                elif shi_dz in he: shi_fushen = True
             if ying_dz in he:
                 ying_sanhe = True
                 if ying_dz == he[1]: ying_zhongshen = True
-                elif ying_dz in he: ying_fushen = True
 
     if shi_sanhe:
         if shi_zhongshen:
             dims['三合局能量']['主'] = 3
             dims['三合局能量']['主评'] = '三合局中神+3'
-        elif shi_fushen:
+        else:
             dims['三合局能量']['主'] = 1.5
             dims['三合局能量']['主评'] = '三合局辅神+1.5'
     else:
@@ -296,7 +309,7 @@ def calc_scores(pan, dong_list):
         if ying_zhongshen:
             dims['三合局能量']['客'] = 3
             dims['三合局能量']['客评'] = '三合局中神+3'
-        elif ying_fushen:
+        else:
             dims['三合局能量']['客'] = 1.5
             dims['三合局能量']['客评'] = '三合局辅神+1.5'
     else:
@@ -353,8 +366,8 @@ def calc_scores(pan, dong_list):
     dims['动爻影响']['客'] = round(dong_ying_eff, 1)
     dims['动爻影响']['主评'] = ' | '.join(dong_notes) if dong_notes else '无动爻'
 
-    extra['六神格局']['主评'] = f"{liushen[shi_idx]}临世"
-    extra['六神格局']['客评'] = f"{liushen[ying_idx]}临应"
+    extra['六神格局']['主评'] = f"{pan['liushen'][shi_idx]}临世"
+    extra['六神格局']['客评'] = f"{pan['liushen'][ying_idx]}临应"
 
     total_shi = round(sum(dims[d]['主'] for d in dims), 2)
     total_ying = round(sum(dims[d]['客'] for d in dims), 2)
@@ -393,7 +406,7 @@ def calc_scores(pan, dong_list):
     full_reason = reason + chong_he_note + liuqin_note
     return dims, extra, total_shi, total_ying, diff, result, full_reason
 
-# ====================== UI界面 ======================
+# =====================页面UI=====================
 with st.form("predict_form"):
     col1, col2, col3 = st.columns([2,2,1])
     with col1:
@@ -402,7 +415,7 @@ with st.form("predict_form"):
     with col2:
         dong_yao_str = st.text_input("动爻 (逗号分隔)", "1", help="多个动爻：1,3；无动爻留空")
     with col3:
-        year = st.number_input("年", 2026, 2000, 2100, 1)
+        year = st.number_input("年", 2026, 2000, 2050, 1)
         month = st.number_input("月", 7, 1, 12, 1)
         day = st.number_input("日", 24, 1, 31, 1)
         hour = st.number_input("时辰(0-23)", 18, 0, 23, 1)
