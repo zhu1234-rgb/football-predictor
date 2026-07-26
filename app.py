@@ -16,9 +16,9 @@ DZ_WX = {
 }
 SHENG = {'木':'火','火':'土','土':'金','金':'水','水':'木'}
 KE    = {'木':'土','土':'水','水':'火','火':'金','金':'木'}
-MU_KU = {'木':'未','火':'戌','金':'丑','土':'辰','水':'辰'}  # 五行墓库
+MU_KU = {'木':'未','火':'戌','金':'丑','土':'辰','水':'辰'}
 
-BAGUA = {1:'乾',2:'兑',3:'离',4:'震',5:'巽','坎',6:'艮',7:'坤'}
+BAGUA = {1:'乾',2:'兑',3:'离',4:'震',5:'巽',6:'坎',7:'艮',8:'坤'}
 SYM2NUM = {'天':1,'泽':2,'火':3,'雷':4,'风':5,'水':6,'山':7,'地':8}
 GUA_WX = {'乾':'金','兑':'金','震':'木','巽':'木','坎':'水','离':'火','艮':'土','坤':'土'}
 NAJIA = {
@@ -46,7 +46,6 @@ def _init_db():
         8: ['坤为地','地雷复','地泽临','地天泰','雷天大壮','泽天夬','水天需','水地比']
     }
     shi_pos = [6,1,2,3,4,5,4,3]
-    # 归魂游魂标记
     youhun_idx = [5,5,5,5,5,5,5,5]
     guihun_idx = [7,7,7,7,7,7,7,7]
     for pal, names in palaces.items():
@@ -86,13 +85,12 @@ def get_liuqin(yao_wx, gong_wx):
     return ''
 
 def shengke(wx1, wx2):
-    """wx1 -> wx2 五行关系"""
     if wx1 == wx2: return '比和'
     if SHENG.get(wx1) == wx2: return '生'
     if KE.get(wx1) == wx2: return '克'
     return ''
 
-# ====================== 【修复】精准节气取月支，删除固定日期算法 ======================
+# ====================== 节气取月支 ======================
 SOLAR_TERM_MONTH_MAP = {
     '小寒':0, '立春':1, '惊蛰':2, '清明':3, '立夏':4, '芒种':5,
     '小暑':6, '立秋':7, '白露':8, '寒露':9, '立冬':10, '大雪':11
@@ -101,7 +99,6 @@ def get_yue_zhi_by_jieqi(year, month, day):
     dt = datetime.date(year, month, day)
     lunar = LunarDate.fromSolarDate(year, month, day)
     jieqi = lunar.getSolarTerm()
-    # 节气对应月支索引 寅=1(正月),卯=2...丑=0
     zhi_idx = SOLAR_TERM_MONTH_MAP.get(jieqi, None)
     if zhi_idx is None:
         prev_day = dt - datetime.timedelta(days=1)
@@ -110,13 +107,12 @@ def get_yue_zhi_by_jieqi(year, month, day):
     return DI_ZHI[zhi_idx]
 
 def day_gz_index(year, month, day):
-    base = datetime.datetime(1,1,1)
-    target = datetime.datetime(year, month, day)
-    delta = (target - base).days
     ref = datetime.datetime(2000,1,1)
-    ref_delta = (ref - base).days
+    target = datetime.datetime(year, month, day)
+    ref_delta = (ref - datetime.datetime(1,1,1)).days
+    target_delta = (target - datetime.datetime(1,1,1)).days
     ref_idx = 54
-    return (ref_idx + (delta - ref_delta)) % 60
+    return (ref_idx + (target_delta - ref_delta)) % 60
 
 def hour_gz(day_gan, hour):
     start_gan = {'甲':'甲','乙':'丙','丙':'戊','丁':'庚','戊':'壬',
@@ -191,7 +187,7 @@ def pai_pan(main_name, bian_name, year, month, day, hour):
         }
     }
 
-# ====================== 【核心修复】五维量化打分引擎 ======================
+# ====================== 核心打分引擎 ======================
 def calc_scores(pan, dong_list):
     main = pan['main']
     bian = pan['bian']
@@ -209,7 +205,6 @@ def calc_scores(pan, dong_list):
     shi_lq = main['liuqin'][shi_idx]
     ying_lq = main['liuqin'][ying_idx]
 
-    # 初始化维度
     dims = {
         '月建旺衰': {'主':0,'客':0,'主评':'','客评':''},
         '日辰作用': {'主':0,'客':0,'主评':'','客评':''},
@@ -219,13 +214,11 @@ def calc_scores(pan, dong_list):
     }
     extra = {'六神格局': {'主':0,'客':0,'主评':'','客评':''}}
 
-    # ---------- 修复1：月建旺衰【区分四库余气/普通比和】 ----------
     def yue_score(dz):
         wx = DZ_WX[dz]
         yue_dz = yue_zhi
         if dz == yue_dz:
             return (2, '临月建')
-        # 月破
         if DI_ZHI.index(dz) == (DI_ZHI.index(yue_dz) + 6) % 12:
             return (-2, '月破')
         sk = shengke(DZ_WX[yue_dz], wx)
@@ -234,12 +227,10 @@ def calc_scores(pan, dong_list):
         if sk == '克':
             return (-1, '被月克')
         if sk == '比和':
-            # 只有月令为四库才论余气
             if yue_dz in ['辰','戌','丑','未']:
                 return (0.5, '余气有根')
             else:
                 return (1, '月令比和相助')
-        # 爻生月令、爻克月令 → 休囚
         return (-1, '休囚无力')
 
     s, note = yue_score(shi_dz)
@@ -247,14 +238,12 @@ def calc_scores(pan, dong_list):
     s, note = yue_score(ying_dz)
     dims['月建旺衰']['客'] = s; dims['月建旺衰']['客评'] = note
 
-    # ---------- 修复2：日辰 区分暗动 / 日破 ----------
     def ri_score(dz, wx, yue_power):
         if dz == ri_zhi:
             return (2, '临日辰')
         he_pairs = [('子','丑'),('寅','亥'),('卯','戌'),('辰','酉'),('巳','申'),('午','未')]
         if (dz, ri_zhi) in he_pairs or (ri_zhi, dz) in he_pairs:
             return (2, '日合起旺')
-        # 日冲
         if DI_ZHI.index(dz) == (DI_ZHI.index(ri_zhi) + 6) % 12:
             if yue_power >= 0:
                 return (1, '旺相暗动')
@@ -274,7 +263,6 @@ def calc_scores(pan, dong_list):
     s, note = ri_score(ying_dz, ying_wx, ying_yue_score)
     dims['日辰作用']['客'] = s; dims['日辰作用']['客评'] = note
 
-    # ---------- 修复3：三合局规则：必须至少一动爻才成局 ----------
     sanhe = [('申','子','辰'), ('巳','酉','丑'), ('寅','午','戌'), ('亥','卯','未')]
     dong_dzs = [main['dizhi'][d-1] for d in dong_list]
     has_dong = len(dong_list) > 0
@@ -314,7 +302,6 @@ def calc_scores(pan, dong_list):
     else:
         dims['三合局能量']['客评'] = '无有效三合'
 
-    # ---------- 4.世应生克 ----------
     sk = shengke(shi_wx, ying_wx)
     if sk == '克':
         dims['世应生克']['主'] = 0.5; dims['世应生克']['客'] = -0.5
@@ -325,7 +312,6 @@ def calc_scores(pan, dong_list):
     else:
         dims['世应生克']['主评'] = '比和'; dims['世应生克']['客评'] = '比和'
 
-    # ---------- 修复4：动爻&变爻逻辑：变爻仅作用本位动爻，禁止跨爻 ----------
     dong_shi_eff = 0.0
     dong_ying_eff = 0.0
     dong_notes = []
@@ -337,7 +323,6 @@ def calc_scores(pan, dong_list):
         bwx = DZ_WX[bdz]
         note = f"动爻{dong_wei}({mdz})"
 
-        # ①本位动爻自身发动加成
         if dong_wei == main['shi']:
             dong_shi_eff += 1.0
             note += " 世动+1"
@@ -345,7 +330,6 @@ def calc_scores(pan, dong_list):
             dong_ying_eff += 1.0
             note += " 应动+1"
 
-        # ②变爻只作用本位动爻（不再跨爻影响世应）
         hsk = shengke(bwx, mwx)
         if hsk == '生':
             if dong_wei == main['shi']: dong_shi_eff +=0.5; note+=" 回头生+0.5"
@@ -357,7 +341,6 @@ def calc_scores(pan, dong_list):
             if dong_wei == main['shi']: dong_shi_eff -=0.5; note+=" 化泄-0.5"
             if dong_wei == main['ying']: dong_ying_eff -=0.5; note+=" 化泄-0.5"
 
-        # ③本位动爻可以生克世应（保留这条规则）
         skshi = shengke(mwx, shi_wx)
         skying = shengke(mwx, ying_wx)
         if skshi == '生': dong_shi_eff +=0.5; note += " 生世+0.5"
@@ -370,16 +353,13 @@ def calc_scores(pan, dong_list):
     dims['动爻影响']['客'] = round(dong_ying_eff, 1)
     dims['动爻影响']['主评'] = ' | '.join(dong_notes) if dong_notes else '无动爻'
 
-    # ---------- 六神格局 ----------
     extra['六神格局']['主评'] = f"{liushen[shi_idx]}临世"
     extra['六神格局']['客评'] = f"{liushen[ying_idx]}临应"
 
-    # 总分
     total_shi = round(sum(dims[d]['主'] for d in dims), 2)
     total_ying = round(sum(dims[d]['客'] for d in dims), 2)
     diff = round(total_shi - total_ying, 2)
 
-    # 格局备注
     chong = main['chong'] or bian['chong']
     he = main['he'] or bian['he']
     youhun = main['youhun']
@@ -390,12 +370,10 @@ def calc_scores(pan, dong_list):
     if youhun: chong_he_note += "游魂，局势多变。"
     if guihun: chong_he_note += "归魂，容易守和。"
 
-    # 六亲修正
     liuqin_note = ''
     if shi_lq == '兄弟':
         liuqin_note = '⚠️世爻临兄弟，竞争互相消耗，优先防范平局。'
 
-    # 判读规则严格匹配文档
     if diff > 3:
         result = "主胜"
         reason = f"主队总分{total_shi}，客队{total_ying}，分差{diff:.2f}＞3，主队优势明显。"
@@ -433,7 +411,6 @@ with st.form("predict_form"):
 
 if submitted:
     try:
-        # 输入清洗
         main_gua = main_gua.strip()
         bian_gua = bian_gua.strip()
         dong_list = []
@@ -449,13 +426,11 @@ if submitted:
         st.success(f"## 预测结论：{result}")
         st.info(reason)
 
-        # 基础排盘信息
         colA, colB, colC = st.columns(3)
         colA.metric("月建", pan['yue_zhi'])
         colB.metric("日辰", f"{pan['ri_gan']}{pan['ri_zhi']}")
         colC.metric("旬空", f"{pan['kong'][0]}、{pan['kong'][1]}")
 
-        # 六爻排盘表格
         rows = []
         for i in range(6):
             rows.append({
@@ -470,7 +445,6 @@ if submitted:
         st.subheader("完整卦盘")
         st.table(pd.DataFrame(rows))
 
-        # 五维打分表
         st.subheader("📊 五维量化评分明细")
         score_rows = []
         for dim_name, s in dims.items():
